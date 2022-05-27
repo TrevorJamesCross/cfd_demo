@@ -28,6 +28,7 @@ from snowflake.connector.pandas_tools import write_pandas
 # ---Define Project Functions---
 # ------------------------------
 
+# define CFD function
 ## define a function to make requests
 def make_request(url, api_key):
     
@@ -35,37 +36,36 @@ def make_request(url, api_key):
     headers = {"Content-Type": "application/json",
                "Authorization": "Bearer {}".format(api_key)}
 
-    # return API call
-    return req.get(url, headers=headers).json()
+    # return API call as df
+    return pd.DataFrame(req.get(url, headers=headers).json())
 
 ## define a function to build the URL
-def build_url(base_url, section, sub_section=None, filters=None):
+def build_url(base_url, section, sub_section='', filters=''):
     
     # combine base_url and section_name
     final_url = join(base_url, section)
     
     # combine w/ sub_section if exists
-    if sub_section is not None:
+    if sub_section != '':
         final_url = join(final_url, sub_section)
         
     # combine w/ filters if exists
-    if filters is not None:
-        final_url = final_url + "?{}".format(filters)
+    if filters != '':
+        final_url = final_url + filters
         
     # return final URL
     return final_url
 
 ## define a function to build filters
-def build_filter(filters_list, plugin_dict):
-    final_filt = ""
+def build_filter(filter_names, filter_plugins):
+    final_filter = "?"
     
     # build filter
-    for filt_name in filters_list:
-        for filt_num in plugin_dict[filt_name]:
-            final_filt =  filters_list[0] + "=" + str(plugin_dict[filters_list[0]]) + "&"
+    for filter_num, filter_name in enumerate(filter_names):
+        final_filter =  final_filter + filter_name + "=" + str(filter_plugins[filter_num]) + "&"
     
-    # return final filter
-    return final_filt
+    # return final filter (remove last '&')
+    return final_filter[:-1]
 
 ## define a function to get column name-dtype string pairs & arrange them for SF
 def get_col_info(df):
@@ -83,6 +83,60 @@ def get_col_info(df):
     # return each pair as a single string separated by a comma
     return ','.join([tup[0] + " " + tup[1] for tup in col_info])
 
+# define SF functions
+## define a function to connect to SF
+def connect_to_SF():
+    
+    # define login credentials
+    user = "trevor.cross"
+    password = "Trevor!=720"
+    account= "aebs.us-east-1"
+    
+    # define operating parameters
+    warehouse = "DEMO_WH"
+    database = "CFB_DEMO"
+    schema = "CFD_RAW"
+    
+    # connect to SF
+    conn = snowflake.connector.connect(user=user,
+                                       password=password,
+                                       account=account,
+                                       warehouse=warehouse,
+                                       database=database,
+                                       schema=schema)
+    
+    # return connector
+    return conn
+
+## define function to create table in SF
+def create_table(conn, table_name, col_info):
+    
+    # create table
+    conn.cursor().execute(
+        """
+        CREATE TABLE
+        {}({})
+        """.format(table_name, col_info)
+        )
+    
+    # print result
+    print(">>> Table {} created!".format(table_name.upper()))
+    
+## define a function to append data into table in SF
+def append_data(conn, df, table_name):
+    
+    # capitalize columns
+    df.columns = map(lambda name: name.upper(), df.columns)
+    
+    # write to table
+    success, num_chunks, num_rows, output = write_pandas(conn, df, table_name.upper())
+    
+    # print result
+    if success:
+        print(">>> {} rows appended to table {}!".format(num_rows, table_name.upper()))
+    else:
+        print(">>> Something went wrong...")
+        
 # ----------------------------
 # ---Define Other Functions---
 # ----------------------------
