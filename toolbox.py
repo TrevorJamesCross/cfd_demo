@@ -1,9 +1,9 @@
 """
 College Football Data Analytics: Toolbox
 Author: Trevor Cross
-Last Updated: 05/25/22
+Last Updated: 06/08/22
 
-Series of functions used to extract data from collegefootballdata.com.
+Series of functions used to extract and analyze data from collegefootballdata.com.
 """
 
 # ----------------------
@@ -24,9 +24,9 @@ from tqdm import tqdm
 import snowflake.connector
 from snowflake.connector.pandas_tools import write_pandas
 
-# ------------------------------
-# ---Define Project Functions---
-# ------------------------------
+# ---------------------------------
+# ---Define SF and API Functions---
+# ---------------------------------
 
 # define CFD function
 ## define a function to make requests
@@ -37,7 +37,7 @@ def make_request(url, api_key):
                "Authorization": "Bearer {}".format(api_key)}
 
     # return API call as df
-    return pd.DataFrame(req.get(url, headers=headers).json())
+    return pd.json_normalize(req.get(url, headers=headers).json())
 
 ## define a function to build the URL
 def build_url(base_url, section, sub_section='', filters=''):
@@ -81,13 +81,13 @@ def get_col_info(df):
     col_info = df.dtypes.reset_index().astype(str).replace(dtype_dict).apply(tuple, axis=1).tolist()
     
     # return each pair as a single string separated by a comma
-    return ','.join([tup[0] + " " + tup[1] for tup in col_info])
+    return (','.join([tup[0] + " " + tup[1] for tup in col_info])).replace('.','_')
 
 # define SF functions
 ## define a function to connect to SF
 def connect_to_SF():
     
-    # define login credentials
+    # define login credentials (DON'T LOOK AT THESE IT'S PRIVATE DON'T LOOK AHHHH)
     user = "trevor.cross"
     password = "Trevor!=720"
     account= "aebs.us-east-1"
@@ -120,23 +120,56 @@ def create_table(conn, table_name, col_info):
         )
     
     # print result
-    print(">>> Table {} created!".format(table_name.upper()))
+    print("\n >>> Table {} created!".format(table_name.upper()))
     
 ## define a function to append data into table in SF
 def append_data(conn, df, table_name):
     
     # capitalize columns
-    df.columns = map(lambda name: name.upper(), df.columns)
+    df.columns = map(lambda name: name.upper().replace('.','_'), df.columns)
     
     # write to table
-    success, num_chunks, num_rows, output = write_pandas(conn, df, table_name.upper())
+    success, num_chunks, num_rows, _ = write_pandas(conn, df, table_name.upper())
     
     # print result
     if success:
-        print(">>> {} rows appended to table {}!".format(num_rows, table_name.upper()))
+        print("\n >>> {} rows appended to table {}!".format(num_rows, table_name.upper()))
     else:
-        print(">>> Something went wrong...")
-        
+        print("\n >>> Something went wrong...")
+
+# -------------------------------------------
+# ---Define Elo Rating Algorithm Functions---
+# -------------------------------------------
+
+## define function to calculate Elo confidence
+def calc_conf(rat_a, rat_b, scaler=400):
+    return 1 / ( 1 + pow(10, (rat_b-rat_a)/scaler) )
+
+## define function to calculate new Elo rating
+def calc_new_rats(home_rat, away_rat, margin, K=25):
+    
+    # calc home & away confidence
+    home_conf = calc_conf(home_rat, away_rat)
+    away_conf = calc_conf(away_rat, home_rat)
+    
+    # determine actualized home confidence
+    if margin > 0:
+        home_act = 1
+    elif margin < 0:
+        home_act = 0
+    else:
+        home_act = 0.5
+    
+    # calc actualized away confidence
+    away_act = 1 - home_act
+    
+    # calc new home & away ratings
+    home_new_rat = home_rat + K*(home_act - home_conf)
+    away_new_rat = away_rat + K*(away_act - away_conf)
+    
+    # return new ratings
+    return ( round(home_new_rat), round(away_new_rat) )
+
 # ----------------------------
 # ---Define Other Functions---
 # ----------------------------
@@ -147,7 +180,7 @@ def cart_prod(list_of_lists):
     # check argument is list of lists
     for lth in list_of_lists:
         if not isinstance(lth, list):
-            raise TypeError("The argument should be a list containing only lists.")
+            raise TypeError("\n >>> The argument should be a list containing only lists.")
     
     # define recursive function
     def inner_cart_prod(list_0, list_1):
