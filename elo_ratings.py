@@ -1,7 +1,7 @@
 """
 College Football Data Analytics: Elo Ratings
 Author: Trevor Cross
-Last Updated: 05/25/22
+Last Updated: 06/08/22
 
 Simuates NCAAF games using an Elo rating algorithm.
 """
@@ -25,50 +25,49 @@ import warnings
 warnings.filterwarnings("ignore")
 
 # ---------------------------
-# ---Pull Team Information---
+# ---Pull Game Information---
 # ---------------------------
 
 # connect to SF
 conn = connect_to_SF()
 
-# obtain team names
-team_query = "select school from teams"
-team_df = pd.read_sql(team_query,conn)
-
-# add column with base Elo ratings
-init_rat = 1500
-team_df['ELO'] = [ init_rat for _ in range(len(team_df)) ]
-
-
-# ---------------------------
-# ---Pull Game Information---
-# ---------------------------
-
 # obtain game data
-game_query = """select home_team, home_points, away_team, away_points from games
-            where season>=2015"""
-game_df = pd.read_sql(game_query,conn)
+game_query = """select season, week, home_team, home_points, away_team, away_points from games
+            where season>=2010"""
+game_df = pd.read_sql(game_query, conn)
 
 # ------------------------
 # ---Run Elo Simulation---
 # ------------------------
 
-# iterate through games
-for game_num, game in tqdm(game_df.iterrows(), desc='Running Elo Sim', unit=' games', total=game_df.shape[0]):
-    
-    # get home & away initial elo ratings
-    home_rat = int(team_df.loc[team_df['SCHOOL']==game['HOME_TEAM'], 'ELO'])
-    away_rat = int(team_df.loc[team_df['SCHOOL']==game['AWAY_TEAM'], 'ELO'])
-    
-    # get margin of victory
-    margin = game['HOME_POINTS'] - game['AWAY_POINTS']
-    
-    # calc new ratings
-    home_rat_new, away_rat_new = calc_new_elo(home_rat, away_rat, margin)
-    
-    # replace ratings
-    team_df.loc[team_df['SCHOOL']==game['HOME_TEAM'], 'ELO'] = home_rat_new
-    team_df.loc[team_df['SCHOOL']==game['AWAY_TEAM'], 'ELO'] = away_rat_new
+# create dictionary to hold team Elo ratings
+team_rats = dict()
 
-# close SF connection
-conn.close()
+# iterate through games
+for game_num, game in tqdm(game_df.iterrows(), desc='Iterating games ', unit=' game', total=game_df.shape[0]):
+    
+    # get current rating for home team
+    if game['HOME_TEAM'] in team_rats:
+        home_rat = team_rats[game['HOME_TEAM']][-1]
+
+    else:
+        team_rats[game['HOME_TEAM']] = [1500]
+        home_rat = team_rats[game['HOME_TEAM']][-1]
+    
+    # get current rating for away team
+    if game['AWAY_TEAM'] in team_rats:
+        away_rat = team_rats[game['AWAY_TEAM']][-1]
+
+    else:
+        team_rats[game['AWAY_TEAM']] = [1500]
+        away_rat = team_rats[game['AWAY_TEAM']][-1]
+        
+    # calculate score margin from game
+    margin = game['HOME_POINTS'] - game['AWAY_POINTS']
+
+    # get new ratings
+    home_rat_new, away_rat_new = calc_new_rats(home_rat, away_rat, margin)
+
+    # append new ratings to dict
+    team_rats[game['HOME_TEAM']].append(home_rat_new)
+    team_rats[game['AWAY_TEAM']].append(away_rat_new)
