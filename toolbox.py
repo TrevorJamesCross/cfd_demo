@@ -1,7 +1,7 @@
 """
 College Football Data Analytics: Toolbox
 Author: Trevor Cross
-Last Updated: 06/08/22
+Last Updated: 06/09/22
 
 Series of functions used to extract and analyze data from collegefootballdata.com.
 """
@@ -19,6 +19,9 @@ import requests as req
 from os.path import join
 import itertools
 from tqdm import tqdm
+
+# import visualization libraries
+import matplotlib.pyplot as plt
 
 # import snowflake connector
 import snowflake.connector
@@ -170,6 +173,16 @@ def calc_new_rats(home_rat, away_rat, margin, K=25):
     # return new ratings
     return ( round(home_new_rat), round(away_new_rat) )
 
+## define function to plot ratings
+def plot_rats(team_rats, team_keys):
+    for key in team_keys:
+        plt.plot(team_rats[key])
+        plt.plot(len(team_rats[key]), team_rats[key][-1], 'kd')
+        plt.text(len(team_rats[key])-10, team_rats[key][-1]+20, key+': '+str(team_rats[key][-1]),
+                     bbox=dict(facecolor='wheat', edgecolor='black', boxstyle='round,pad=0.25'))
+        plt.xlabel("Game Number")
+        plt.ylabel("Elo Rating")
+    
 # ----------------------------
 # ---Define Other Functions---
 # ----------------------------
