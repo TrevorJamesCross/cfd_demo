@@ -1,7 +1,7 @@
 """
 College Football Data Analytics: Toolbox
 Author: Trevor Cross
-Last Updated: 06/09/22
+Last Updated: 06/14/22
 
 Series of functions used to extract and analyze data from collegefootballdata.com.
 """
@@ -17,8 +17,7 @@ import pandas as pd
 # import support libraries
 import requests as req
 from os.path import join
-import itertools
-from tqdm import tqdm
+from operator import itemgetter
 
 # import visualization libraries
 import matplotlib.pyplot as plt
@@ -174,14 +173,31 @@ def calc_new_rats(home_rat, away_rat, margin, K=25):
     return ( round(home_new_rat), round(away_new_rat) )
 
 ## define function to plot ratings
-def plot_rats(team_rats, team_keys):
-    for key in team_keys:
-        plt.plot(team_rats[key])
-        plt.plot(len(team_rats[key]), team_rats[key][-1], 'kd')
-        plt.text(len(team_rats[key])-10, team_rats[key][-1]+20, key+': '+str(team_rats[key][-1]),
-                     bbox=dict(facecolor='wheat', edgecolor='black', boxstyle='round,pad=0.25'))
-        plt.xlabel("Game Number")
-        plt.ylabel("Elo Rating")
+def plot_rats(team_rats, team_name):
+    
+        # extract dates and ratings
+        dates_list = list(map(itemgetter(0), team_rats[team_name]))
+        rats_list = list(map(itemgetter(1), team_rats[team_name]))
+        
+        # define graph styling
+        plt.style.use('bmh')
+        plt.rcParams["figure.figsize"] = [15,7.5]
+        
+        # plot ratings against date
+        plt.plot(dates_list, rats_list)
+        
+        # add title
+        plt.title(team_name + ' Elo Ratings')
+        
+        # adjust xticks
+        seasons = []
+        season_start = []
+        for date in dates_list:
+            if date[0:4] not in seasons:
+                seasons.append(date[0:4])
+                season_start.append(date)
+                
+        plt.xticks(season_start, rotation=45)
     
 # ----------------------------
 # ---Define Other Functions---
