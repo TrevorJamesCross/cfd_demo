@@ -33,9 +33,12 @@ warnings.filterwarnings("ignore")
 conn = connect_to_SF()
 
 # obtain game data
-game_query = """select start_date, home_team, home_points, away_team, away_points from games
-                where season >= 2001
-                order by start_date"""
+game_query = """
+             select start_date, home_team, home_points, away_team, away_points 
+             from games
+             where season >= 2001
+             order by start_date
+             """
 game_df = pd.read_sql(game_query, conn)
 
 # close connection
