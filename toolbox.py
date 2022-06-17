@@ -1,7 +1,7 @@
 """
 College Football Data Analytics: Toolbox
 Author: Trevor Cross
-Last Updated: 06/14/22
+Last Updated: 06/16/22
 
 Series of functions used to extract and analyze data from collegefootballdata.com.
 """
@@ -143,6 +143,10 @@ def append_data(conn, df, table_name):
 # ---Define Elo Rating Algorithm Functions---
 # -------------------------------------------
 
+## define function to calculate margin of victory bonus
+def MOV_mult(margin):
+    return np.log(abs(margin)+1)
+
 ## define function to calculate Elo confidence
 def calc_conf(rat_a, rat_b, scaler=400):
     return 1 / ( 1 + pow(10, (rat_b-rat_a)/scaler) )
@@ -165,12 +169,15 @@ def calc_new_rats(home_rat, away_rat, margin, K=25):
     # calc actualized away confidence
     away_act = 1 - home_act
     
-    # calc new home & away ratings
-    home_new_rat = home_rat + K*(home_act - home_conf)
-    away_new_rat = away_rat + K*(away_act - away_conf)
+    # calc margin of victory multiplier
+    mult = MOV_mult(margin)
     
-    # return new ratings
-    return ( round(home_new_rat), round(away_new_rat) )
+    # calc new home & away ratings
+    home_rat_new = home_rat + mult*K*(home_act - home_conf)
+    away_rat_new = away_rat + mult*K*(away_act - away_conf)
+    
+    # return new ratings, confidence, and actualized value
+    return (round(home_rat_new), home_conf, home_act), (round(away_rat_new), away_conf, away_act)
 
 ## define function to plot ratings
 def plot_rats(team_rats, team_name):
@@ -181,7 +188,7 @@ def plot_rats(team_rats, team_name):
         
         # define graph styling
         plt.style.use('bmh')
-        plt.rcParams["figure.figsize"] = [15,7.5]
+        plt.rcParams["figure.figsize"] = [20,10]
         
         # plot ratings against date
         plt.plot(dates_list, rats_list)
