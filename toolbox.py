@@ -1,7 +1,7 @@
 """
 College Football Data Analytics: Toolbox
 Author: Trevor Cross
-Last Updated: 06/16/22
+Last Updated: 06/17/22
 
 Series of functions used to extract and analyze data from collegefootballdata.com.
 """
@@ -21,6 +21,7 @@ from operator import itemgetter
 
 # import visualization libraries
 import matplotlib.pyplot as plt
+from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
 
 # import snowflake connector
 import snowflake.connector
@@ -143,9 +144,21 @@ def append_data(conn, df, table_name):
 # ---Define Elo Rating Algorithm Functions---
 # -------------------------------------------
 
+## define function to get initial Elo rating
+def get_init_rat(team_name, fbs_team_list):
+    
+    # if fbs team, return higher init rating
+    if team_name in fbs_team_list:
+        return 1500
+    
+    # if not fbs team, return lower init rating
+    else:
+        return 1200
+
 ## define function to calculate margin of victory bonus
-def MOV_mult(margin):
-    return np.log(abs(margin)+1)
+def MOV_mult(home_rat, away_rat, margin):
+    n = np.sqrt(15)
+    return log_n(abs(margin)+1, n=n) * ( n / (abs(home_rat - away_rat)*10**-3 + n))
 
 ## define function to calculate Elo confidence
 def calc_conf(rat_a, rat_b, scaler=400):
@@ -170,7 +183,7 @@ def calc_new_rats(home_rat, away_rat, margin, K=25):
     away_act = 1 - home_act
     
     # calc margin of victory multiplier
-    mult = MOV_mult(margin)
+    mult = MOV_mult(home_rat, away_rat, margin)
     
     # calc new home & away ratings
     home_rat_new = home_rat + mult*K*(home_act - home_conf)
@@ -210,6 +223,15 @@ def plot_rats(team_rats, team_name):
 # ---Define Other Functions---
 # ----------------------------
 
+## define a function to calculate log base n
+def log_n(x, n=10):
+    return np.log(x) / np.log(n)
+
+## define a function to plot confusion matrix
+def disp_conf_mat(preds, acts):
+    conf_mat = confusion_matrix(acts, preds)
+    ConfusionMatrixDisplay(conf_mat).plot()
+    
 ## define a function to take the cartesian product of an arbitrary number of lists
 def cart_prod(list_of_lists):
     
@@ -226,7 +248,7 @@ def cart_prod(list_of_lists):
                 inner_result.append([lth,mth])
         return inner_result
     
-    #define funciton to flatten 2d list
+    # define funciton to flatten 2d list
     def flatten(nested_list):
         flat_list = []
         for el in nested_list:
