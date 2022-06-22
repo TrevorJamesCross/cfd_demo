@@ -1,0 +1,12 @@
+{
+  "type": "service_account",
+  "project_id": "ncaa-football-346913",
+  "private_key_id": "ad3d45f2ebe1f52251b6a207890fe973ae540a2e",
+  "private_key": "-----BEGIN PRIVATE KEY-----\nMIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQC2wjkPG7avVQ+M\nfyQTzREQpYuozzJcuyn3rc8uiVoLF4HYRlblAxbZwe4h5VfEGvDgHzki0y/e2cq2\nsbvaND3rcSC0Gs5W+jzzDH87i+588zPsDf82j7jKC9GtLHmDbTKUS56kLQjp3okk\nLQ8kEazwgYyqNLIXSpqbEkXupGerrqvAVpD/ze9/CXoR9xYVZVW/uOQCPA69Fc5y\nNF5R7XrkyUovtMsyiGXUdboAv9++2SvfZjhR7oE9T1zNw+OGqRWLQ33kWWQallR/\nkZ4KFf4oh9tGxOzOfs52Rjznw9/emjEKJRMRIEdcnbIQvuPGMKMI+/okv/nrXDj4\nGHT6C489AgMBAAECggEADgawdeAg4Gp1D8mXNXzUzTQDWLCUMyk7IpLglnf8pOLI\nOJbHZvqad5pqYggVuQt/Rpgm3K0cHKyW4fgYjHnbcbUkNyZihSrd4CJqpmGKK2VH\n7Bsz5dZYbotDK5kA92z7R4XZNkzthPNrD490vMYtgWTT7KEwNNjpLjMUEmlkOnkD\nNWRgCMQANUSuFYgRyHDkfLiX4bY9fcNEIIt2h+iFAAj01SjOkm5aWwmXTvL/EidS\nxeEtQ3DkOLxKyHz7EWJkqs1hTM/R+59ITbwwcRLwelbhKazhBE0rBI06pNiMygkN\nYawB3Oop6C+T+5Sz2DIMkzCZxuhNE3mGXwWzn8tBoQKBgQDx2fK0q5bf6QHbCHuN\nk2kf5FXucSn5su/BK459CE1uUwNm76o51F884+ShoprGY7bCkcYGZFTs9ghuOdER\nGBYEzF1qddeBTEqw3CwvUD9dXvaTsIhx7XXD20b8yQcKUDRnnUDw5YoCRBpTLAxd\nLXMdDG6wC3xA6ngWg5hOzNhtoQKBgQDBc0gp45pzn5qobfVdcr7LO/98/Q40Iz2V\nrWEZ9JYQsHdY7mUnK+dV1iqlpLyK4x/RvyEFbN+EMD7TW+98QdZ9Ikxpg7MtdlGm\nGxtRN7aPatEkipdl4zOmzDO6bBDljx5Ej0PeiCrmENDT3BLW9+xmDJNZD+H8/PEE\n+HKg48ykHQKBgQDKckFK4RODTN2Dxr79zLZDvvP7i3iyjwlIrrgwi2Gdhxmi8d2R\nWOd75dv9PUrH5LIYfsO/l/7K+EwoUHdkEsBjtdpAgnIpxn4DO9o0pLzV4OcQy8X7\nb+WTVBtBANnG1Up4rVauD8aNjQpoMsgKuz/Pwhdpf8O750kst20oESrd4QKBgQCU\nawcdpFL2jKhSuvI6PPPm52RQF7KTC8qPEJNkH4QWz9zxLQ4MbKGy+HqF1YsWH8Vk\n3ffOusYOHBnHfUyTD8wo+2yWs4V/xrxD7Z4axNza0cAeAfrAH/2b5iV1zL118kTt\nouEWVXBcTOB6+ui1Z0dG0DUoaoge2k1sW9VOXRe/fQKBgGE2lHwgN9YTGaKuystz\nap30CnJh/0mR+uROHH42nT3595YU0BPOqTUw6wxMFxlsmcB/0OeM+cm3c67tdgpo\nnQrWDC6/TuLF+cMJoCZvSh0KWBsHc8hx+hJFSr57+3CpvQYWK0jwbKPfrHulW0jY\n9uYllZ1Kxtm/fkGubqYjYPpb\n-----END PRIVATE KEY-----\n",
+  "client_email": "ae-service-account@ncaa-football-346913.iam.gserviceaccount.com",
+  "client_id": "114654159572231225076",
+  "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+  "token_uri": "https://oauth2.googleapis.com/token",
+  "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+  "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/ae-service-account%40ncaa-football-346913.iam.gserviceaccount.com"
+}

@@ -1,0 +1,19 @@
+aebs_trevor:
+  target: dev
+  outputs:
+    dev:
+      type: snowflake
+      account: aebs.us-east-1
+      
+      # authentification
+      user: trevor.cross
+      password: Trevor!=720
+      
+      # parameters
+      database: cfb_demo
+      warehouse: demo_wh
+      schema: dbt_tcross
+      threads: 4
+      client_session_keep_alive: False
+      query_tag: put_tag_here
+      
