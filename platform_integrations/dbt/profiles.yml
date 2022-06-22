@@ -3,16 +3,16 @@ aebs_trevor:
   outputs:
     dev:
       type: snowflake
-      account: aebs.us-east-1
       
       # authentification
       user: #<username>
       password: #<password>
+      account: #<account>
       
       # parameters
-      database: cfb_demo
-      warehouse: demo_wh
-      schema: dbt_tcross
+      database: #<database>
+      warehouse: #<warehouse>
+      schema: #<schema>
       threads: 4
       client_session_keep_alive: False
       query_tag: put_tag_here
