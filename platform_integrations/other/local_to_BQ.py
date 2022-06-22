@@ -1,7 +1,7 @@
 """
 NCAAF Demo: Local Data to BigQuery
 Author: Trevor Cross
-Last Updated: 04/18/22
+Last Updated: 06/22/22
 
 Create an algorithm to send local csv data to BigQuery. This script is NOT
 assumed to run in its entirety, but iterively sub-section by sub-section.
@@ -28,7 +28,7 @@ from os.path import join
 # -----------------------
 
 # define working directory path
-working_dir_path = "/home/tjcross/python_dir/projects/ncaaf_demo"
+working_dir_path = "~/CFD_demo"
 
 # build credentials
 key_file = #<key>
