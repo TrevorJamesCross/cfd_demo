@@ -31,7 +31,7 @@ from os.path import join
 working_dir_path = "/home/tjcross/python_dir/projects/ncaaf_demo"
 
 # build credentials
-key_file = "ncaa-football-346913-ad3d45f2ebe1.json"
+key_file = #<key>
 key_path = join(working_dir_path, key_file)
 
 credentials = service_account.Credentials.from_service_account_file(key_path)
