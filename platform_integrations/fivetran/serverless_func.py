@@ -1,23 +1,11 @@
 """
 NCAAF Demo: Serverless Function
 Author: Trevor Cross
-Last Updated: 04/18/22
+Last Updated: 06/22/22
 
 Define a serverless function to retrieve data from an API call. This script
 is intended for use in Fivetran as a connector to Snowflake.
 """
-
-# ------------------------
-# ---Define Credentials---
-# ------------------------
-
-# define credentials in JSON format
-
-{
-"consumerKey": "",
-"consumerSecret": "",
-"api_key": "4vgTNfKfVVN0undVZijW9OZFNhmnucIYzSECsmrDW0RKGrdeA3+NiqbS7kAq3hUI"
-}
 
 # ----------------------
 # ---Import Libraries---
