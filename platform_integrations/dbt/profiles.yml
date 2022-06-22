@@ -6,8 +6,8 @@ aebs_trevor:
       account: aebs.us-east-1
       
       # authentification
-      user: trevor.cross
-      password: Trevor!=720
+      user: #<username>
+      password: #<password>
       
       # parameters
       database: cfb_demo
