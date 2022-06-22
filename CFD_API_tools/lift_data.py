@@ -1,7 +1,7 @@
 """
 College Football Data Analytics: Lift Data
 Author: Trevor Cross
-Last Updated: 06/08/22
+Last Updated: 06/22/22
 
 Extracts available data from collegefootballdata.com and loads it into
 snowflake.
@@ -26,7 +26,7 @@ from toolbox import *
 conn = connect_to_SF()
 
 # predefine API key
-api_key = "4vgTNfKfVVN0undVZijW9OZFNhmnucIYzSECsmrDW0RKGrdeA3+NiqbS7kAq3hUI"
+api_key = #<key>
 
 # define filters
 empty = ['']
