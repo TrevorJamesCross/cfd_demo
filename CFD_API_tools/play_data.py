@@ -68,7 +68,7 @@ def get_play_data(year_iter, week_iter, api_key):
 if __name__ == "__main__":
     
     # predefine API key
-    api_key = "4vgTNfKfVVN0undVZijW9OZFNhmnucIYzSECsmrDW0RKGrdeA3+NiqbS7kAq3hUI"
+    api_key = #<key>
     
     # define years & weeks to get data from
     years = np.arange(2001,2016,1)
