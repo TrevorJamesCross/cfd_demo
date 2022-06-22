@@ -1,7 +1,7 @@
 """
 College Football Data Analytics: Elo Ratings
 Author: Trevor Cross
-Last Updated: 06/17/22
+Last Updated: 06/21/22
 
 Simuates NCAAF games using an Elo rating algorithm.
 """
@@ -15,12 +15,14 @@ import numpy as np
 import pandas as pd
 
 # import support functions
+import sys
 from tqdm import tqdm
 from datetime import datetime
 from operator import itemgetter
 from sklearn.metrics import log_loss, accuracy_score
 
 # import toolbox functions
+sys.path.insert(1, '/home/tjcross/CFD_demo/')
 from toolbox import *
 
 # ---------------------------
