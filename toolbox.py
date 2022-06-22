@@ -91,14 +91,14 @@ def get_col_info(df):
 def connect_to_SF():
     
     # define login credentials (DON'T LOOK AT THESE IT'S PRIVATE DON'T LOOK AHHHH)
-    user = "trevor.cross"
-    password = "Trevor!=720"
-    account= "aebs.us-east-1"
+    user = #<user>
+    password = #<password>
+    account= #<account>
     
     # define operating parameters
-    warehouse = "DEMO_WH"
-    database = "CFB_DEMO"
-    schema = "CFD_RAW"
+    warehouse = #<warehouse>
+    database = #<database>
+    schema = #<schema>
     
     # connect to SF
     conn = snowflake.connector.connect(user=user,
