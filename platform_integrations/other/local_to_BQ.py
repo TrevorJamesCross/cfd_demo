@@ -44,9 +44,9 @@ client = bigquery.Client(credentials=credentials)
 # -----------------------
 
 # build table path
-project_name = "ncaa-football-346913"
-dataset_name = "sports_reference"
-table_name = "raw_game_boxscores"
+project_name = #<project_name>
+dataset_name = #<dataset_name>
+table_name = #<table_name>
 
 table_id = project_name + "." + dataset_name + "." + table_name
 
