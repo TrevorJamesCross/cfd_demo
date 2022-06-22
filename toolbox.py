@@ -1,7 +1,7 @@
 """
 College Football Data Analytics: Toolbox
 Author: Trevor Cross
-Last Updated: 06/17/22
+Last Updated: 06/22/22
 
 Series of functions used to extract and analyze data from collegefootballdata.com.
 """
@@ -158,7 +158,7 @@ def get_init_rat(team_name, fbs_team_list):
 ## define function to calculate margin of victory bonus
 def MOV_mult(home_rat, away_rat, margin):
     n = np.sqrt(15)
-    return log_n(abs(margin)+1, n=n) * ( n / (abs(home_rat - away_rat)*10**-3 + n))
+    return log_n(abs(margin)+1, n=n) * ( n / (abs(home_rat - away_rat)*10**-3 + n) )
 
 ## define function to calculate Elo confidence
 def calc_conf(rat_a, rat_b, scaler=400):
