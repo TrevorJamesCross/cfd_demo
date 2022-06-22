@@ -16,6 +16,8 @@ import numpy as np
 import pandas as pd
 
 # import toolbox functions
+repo_dir = '~/CFD_demo/'
+sys.path.insert(1, repo_dir)
 from toolbox import *
 
 # ------------------------------

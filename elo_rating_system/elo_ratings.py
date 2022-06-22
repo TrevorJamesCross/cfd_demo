@@ -22,15 +22,19 @@ from operator import itemgetter
 from sklearn.metrics import log_loss, accuracy_score
 
 # import toolbox functions
-sys.path.insert(1, '/home/tjcross/CFD_demo/')
+repo_dir = '~/CFD_demo/'
+sys.path.insert(1, repo_dir)
 from toolbox import *
 
 # ---------------------------
 # ---Pull Game Information---
 # ---------------------------
 
+# define path to SF credentials
+json_creds_path = '/home/tjcross/secrets/SF_creds.json'
+
 # connect to SF
-conn = connect_to_SF()
+conn = connect_to_SF(json_creds_path)
 
 # obtain game data
 game_query = """

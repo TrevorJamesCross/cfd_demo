@@ -18,6 +18,7 @@ import pandas as pd
 import requests as req
 from os.path import join
 from operator import itemgetter
+import json
 
 # import visualization libraries
 import matplotlib.pyplot as plt
@@ -88,25 +89,18 @@ def get_col_info(df):
 
 # define SF functions
 ## define a function to connect to SF
-def connect_to_SF():
+def connect_to_SF(json_creds_path):
     
-    # define login credentials (DON'T LOOK AT THESE IT'S PRIVATE DON'T LOOK AHHHH)
-    user = #<user>
-    password = #<password>
-    account= #<account>
-    
-    # define operating parameters
-    warehouse = #<warehouse>
-    database = #<database>
-    schema = #<schema>
-    
-    # connect to SF
-    conn = snowflake.connector.connect(user=user,
-                                       password=password,
-                                       account=account,
-                                       warehouse=warehouse,
-                                       database=database,
-                                       schema=schema)
+    # read JSON & connect to SF
+    with open(json_creds_path) as file:
+        creds = json.load(file)
+        
+    conn = snowflake.connector.connect(user=creds['user'],
+                                           password=creds['password'],
+                                           account=creds['account'],
+                                           warehouse=creds['warehouse'],
+                                           database=creds['database'],
+                                           schema=creds['schema'])
     
     # return connector
     return conn

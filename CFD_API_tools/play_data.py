@@ -1,7 +1,7 @@
 """
 College Football Data Analytics: Play Data
 Author: Trevor Cross
-Last Updated: 05/24/22
+Last Updated: 06/22/22
 
 Extract data from collegefootballdata.com and load it into Snowflake.
 
@@ -22,12 +22,18 @@ import numpy as np
 import pandas as pd
 
 # import support libraries
+import sys
 import requests as req
 from tqdm import tqdm
 
 # import snowflake connector
 import snowflake.connector
 from snowflake.connector.pandas_tools import write_pandas
+
+# import toolbox functions
+repo_dir = '~/CFD_demo/'
+sys.path.insert(1, repo_dir)
+from toolbox import *
 
 # ---------------------------
 # ---Extract Data from CFD---
@@ -100,23 +106,8 @@ def get_col_info(df):
 ## run script section
 if __name__ == "__main__":
     
-    # define login credentials
-    user = "trevor.cross"
-    password = "Trevor!=720"
-    account= "aebs.us-east-1"
-    
-    # define operating parameters
-    warehouse = "DEMO_WH"
-    database = "CFB_DEMO"
-    schema = "CFD_RAW"
-    
-    # connect to SF
-    conn = snowflake.connector.connect(user=user,
-                                       password=password,
-                                       account=account,
-                                       warehouse=warehouse,
-                                       database=database,
-                                       schema=schema)
+    #connect to SF
+    conn = connect_to_SF()
     
     # get column info w/ UDF
     col_info = get_col_info(play_data)
