@@ -21,14 +21,14 @@ from google.oauth2 import service_account
 
 # import support libraries
 import decimal
-from os.path import join
+from os.path import expanduser, join
 
 # -----------------------
 # ---Connect to Client---
 # -----------------------
 
 # define working directory path
-working_dir_path = "~/CFD_demo"
+working_dir_path = join(expanduser('~'),'CFD_demo')
 
 # build credentials
 key_file = #<key>

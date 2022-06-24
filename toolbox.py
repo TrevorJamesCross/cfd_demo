@@ -152,18 +152,18 @@ def get_init_rat(team_name, fbs_team_list):
 ## define function to calculate margin of victory bonus
 def MOV_mult(home_rat, away_rat, margin):
     n = np.sqrt(15)
-    return log_n(abs(margin)+1, n=n) * ( n / (abs(home_rat - away_rat)*10**-3 + n) )
+    return log_n(abs(margin)+1, n=n) * ( 2.2 / (abs(home_rat - away_rat)*10**-3 + 2.2) )
 
 ## define function to calculate Elo confidence
 def calc_conf(rat_a, rat_b, scaler=400):
     return 1 / ( 1 + pow(10, (rat_b-rat_a)/scaler) )
 
 ## define function to calculate new Elo rating
-def calc_new_rats(home_rat, away_rat, margin, K=25):
+def calc_new_rats(home_rat, away_rat, margin, K=25, scaler=400):
     
     # calc home & away confidence
-    home_conf = calc_conf(home_rat, away_rat)
-    away_conf = calc_conf(away_rat, home_rat)
+    home_conf = calc_conf(home_rat, away_rat, scaler=scaler)
+    away_conf = calc_conf(away_rat, home_rat, scaler=scaler)
     
     # determine actualized home confidence
     if margin > 0:

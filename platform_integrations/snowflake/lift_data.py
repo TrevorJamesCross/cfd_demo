@@ -1,7 +1,7 @@
 """
 College Football Data Analytics: Lift Data
 Author: Trevor Cross
-Last Updated: 06/22/22
+Last Updated: 06/24/22
 
 Extracts available data from collegefootballdata.com and loads it into
 snowflake.
@@ -15,8 +15,13 @@ snowflake.
 import numpy as np
 import pandas as pd
 
+# import support functions
+from os.path import expanduser, join
+import sys
+import json
+
 # import toolbox functions
-repo_dir = '~/CFD_demo/'
+repo_dir = join(expanduser('~'),'CFD_demo')
 sys.path.insert(1, repo_dir)
 from toolbox import *
 
@@ -24,15 +29,24 @@ from toolbox import *
 # ---Define Data Dictionaries---
 # ------------------------------
 
-# connect to SF
-conn = connect_to_SF()
+# define path to API credentials
+json_api_key = join(expanduser('~'), 'secrets/CFD_API_key.json')
 
-# predefine API key
-api_key = #<key>
+# get API key
+with open(json_api_key) as file:
+    creds = json.load(file)
+    
+api_key = creds['api_key']
+
+# define path to SF credentials
+json_creds_path = join(expanduser('~'), 'secrets/SF_creds.json')
+
+# connect to SF
+conn = connect_to_SF(json_creds_path)
 
 # define filters
 empty = ['']
-years = list(np.arange(1869,2000,1))
+years = list(np.arange(2013,2022,1))
 weeks = list(np.arange(1,21,1))
 
 teams_fbs_resp = list(conn.cursor().execute("SELECT school FROM teams_fbs"))
@@ -42,10 +56,10 @@ teams_fbs = [''.join(school).replace(' ','%20') for school in teams_fbs_resp]
 base_url = "https://api.collegefootballdata.com"
 
 # define list of sections
-sections = ['games']
+sections = ['lines']
 
 # define dictionary of subsections
-subsection_dict = {'games':['']}
+subsection_dict = {'lines':['']}
 
 # define filters for subsections
 filter_dict = {'':['year','week']}

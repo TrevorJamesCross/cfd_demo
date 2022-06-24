@@ -3,10 +3,10 @@ sudo docker run -it --rm \
 --mount type=bind,source=${PWD}/tab_tmp,target=/app/log \
 datadotworld/dwcc:latest catalog-tableau \
 --account=aebs-dev \
---tableau-api-base-url=http://tableau.aebsinternal.com/api/3.10/ \
---tableau-username=<username> \
+--tableau-api-base-url=<url> \
+--tableau-site=<site> \
+--tableau-username=<user> \
 --tableau-password=<password> \
---tableau-project=<project> \
---tableau-site="https://region.online.tableau.com/#/site/AEBS/home" \
+--tableau-project="CFB Dashboards" \
 --name=tableau_catalog \
 --output=/dwcc-output
