@@ -3,7 +3,8 @@ College Football Data Analytics: Elo Ratings
 Author: Trevor Cross
 Last Updated: 06/23/22
 
-Simuates NCAAF games using an Elo rating algorithm.
+Simuates NCAAF games using an Elo rating algorithm and compares results against
+a naive method.
 """
 
 # ----------------------
@@ -245,7 +246,7 @@ for perm in perms:
         
         print("\n")
     
-    if False:
+    if True:
         print("\n >>> perm: {}".format(perm))
         
         test_loss = log_loss(test_acts, test_preds)
@@ -257,7 +258,7 @@ for perm in perms:
         test_acc = accuracy_score(test_acts, list(map(round,test_preds)))
         print("\n >>> Accuracy (Test Data): {}".format(test_acc))
         
-        naive_test_acc = accuracy_score(naive_train_acts, list(map(round,naive_train_preds)))
+        naive_test_acc = accuracy_score(naive_test_acts, list(map(round,naive_test_preds)))
         print(" >>> Naive Accuracy (Test Data): {}".format(naive_test_acc))
         
         print("\n")
