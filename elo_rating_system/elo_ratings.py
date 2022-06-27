@@ -1,10 +1,10 @@
 """
-College Football Data Analytics: Elo Ratings
+College Football Data Demo: Elo Rating Evaluation
 Author: Trevor Cross
-Last Updated: 06/23/22
+Last Updated: 06/27/22
 
-Simuates NCAAF games using an Elo rating algorithm and compares results against
-a naive method.
+Simuates NCAAF games using an Elo rating algorithm and compares the results 
+against a naive method. Incorporates parameter tuning.
 """
 
 # ----------------------
@@ -41,7 +41,7 @@ conn = connect_to_SF(json_creds_path)
 # obtain game data
 game_query = """
              select start_date, home_team, home_points, away_team, away_points from games
-             where season >= 1969 and season < 1990
+             where season >= 1969 and season < 2000
              order by start_date
              """
                 
@@ -100,15 +100,17 @@ for game_num, game in tqdm(game_df.iterrows(), desc='Running Naive Sim ', unit='
 # ------------------------
 
 # define parameter iterations
-retain_weights = [0.90]
-Ks = [50]
-scalers = [450]
+retain_weights = [0.85]
+Ks = [30]
+scalers = [350]
+MOV_base = [np.exp(1)]
 
 # get parameter permutations
-perms = cart_prod([retain_weights, Ks, scalers])
+perms = cart_prod([retain_weights, Ks, scalers, MOV_base])
 
-results_dict = dict()
-
+# store perm results
+results = []
+    
 # run elo simulation for each permutation of paramters
 for perm in perms:
     
@@ -178,7 +180,7 @@ for perm in perms:
         margin = game['HOME_POINTS'] - game['AWAY_POINTS']
     
         # calc new ratings
-        home_info, away_info = calc_new_rats(home_rat, away_rat, margin, K=perm[1], scaler=perm[2])
+        home_info, away_info = calc_new_rats(home_rat, away_rat, margin, K=perm[1], scaler=perm[2], log_base=perm[3])
         home_rat_new, home_conf, home_act = home_info
         away_rat_new, away_conf, away_act = away_info
         
@@ -227,8 +229,8 @@ for perm in perms:
     naive_train_preds, naive_test_preds = naive_preds[:int(0.7*len(naive_preds))], naive_preds[int(0.7*len(naive_preds)):]
     naive_train_acts, naive_test_acts = naive_acts[:int(0.7*len(naive_acts))], naive_acts[int(0.7*len(naive_acts)):]
     
-    # calc log loss & accuracy
-    if True:
+    # calc log loss and accuracy of train data
+    if len(perms) > 0:
         
         print("\n >>> perm: {}".format(perm))
         
@@ -245,8 +247,11 @@ for perm in perms:
         print(" >>> Naive Accuracy (Train Data): {}".format(naive_train_acc))
         
         print("\n")
+        
+        results.append( (perm, train_loss, train_acc) )
     
-    if True:
+    # calc log loss and acc of test data
+    if len(perms) == 1:
         print("\n >>> perm: {}".format(perm))
         
         test_loss = log_loss(test_acts, test_preds)
@@ -262,3 +267,8 @@ for perm in perms:
         print(" >>> Naive Accuracy (Test Data): {}".format(naive_test_acc))
         
         print("\n")
+
+# sort perm results by log loss
+if len(perms) > 0:
+    results = sorted(results, key=itemgetter(1), reverse=False)
+    print("\n >>> Lowest Loss Perm: {}".format(results[0]))

@@ -1,7 +1,7 @@
 """
-College Football Data Analytics: Toolbox
+College Football Data Demo: Toolbox
 Author: Trevor Cross
-Last Updated: 06/22/22
+Last Updated: 06/27/22
 
 Series of functions used to extract and analyze data from collegefootballdata.com.
 """
@@ -150,16 +150,15 @@ def get_init_rat(team_name, fbs_team_list):
         return 1200
 
 ## define function to calculate margin of victory bonus
-def MOV_mult(home_rat, away_rat, margin):
-    n = np.sqrt(15)
-    return log_n(abs(margin)+1, n=n) * ( 2.2 / (abs(home_rat - away_rat)*10**-3 + 2.2) )
+def MOV_mult(home_rat, away_rat, margin, log_base=np.sqrt(15)):
+    return log_n(abs(margin)+1, n=log_base) * ( 2.2 / (abs(home_rat - away_rat)*10**-3 + 2.2) )
 
 ## define function to calculate Elo confidence
 def calc_conf(rat_a, rat_b, scaler=400):
     return 1 / ( 1 + pow(10, (rat_b-rat_a)/scaler) )
 
 ## define function to calculate new Elo rating
-def calc_new_rats(home_rat, away_rat, margin, K=25, scaler=400):
+def calc_new_rats(home_rat, away_rat, margin, K=25, scaler=400, log_base=np.sqrt(15)):
     
     # calc home & away confidence
     home_conf = calc_conf(home_rat, away_rat, scaler=scaler)
@@ -177,7 +176,7 @@ def calc_new_rats(home_rat, away_rat, margin, K=25, scaler=400):
     away_act = 1 - home_act
     
     # calc margin of victory multiplier
-    mult = MOV_mult(home_rat, away_rat, margin)
+    mult = MOV_mult(home_rat, away_rat, margin, log_base=log_base)
     
     # calc new home & away ratings
     home_rat_new = home_rat + mult*K*(home_act - home_conf)
@@ -262,3 +261,8 @@ def cart_prod(list_of_lists):
     
     else:
         return [tuple([lth]) for lth in list_of_lists[0]]
+
+## define function to save dictionary as JSON file locally
+def dict_to_json(my_dict, file_path):
+    with open(file_path, "w+") as file:
+        json.dump(my_dict, file)
