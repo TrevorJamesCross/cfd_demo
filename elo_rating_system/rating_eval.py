@@ -114,79 +114,8 @@ results = []
 # run elo simulation for each permutation of paramters
 for perm in perms:
     
-    # define reset weight
-    retain_weight = perm[0] ## retain_weight=1 => no reset, retain_weight=0 => reset to init_rat
-    
-    # create dictionary to hold team Elo ratings
-    team_rats = dict()
-    
-    # iterate through games
-    for game_num, game in tqdm(game_df.iterrows(), desc='Running Elo Sim ', unit=' game', total=game_df.shape[0]):
-        
-        # parse current date
-        date = str(datetime.strptime(game['START_DATE'][0:10], '%Y-%m-%d').date())
-    
-        # if home team exists and in same season
-        if game['HOME_TEAM'] in team_rats and int(team_rats[game['HOME_TEAM']][-1][0][0:4]) == int(date[0:4]):
-            
-            # get current home rating
-            home_rat = team_rats[game['HOME_TEAM']][-1][1]
-        
-        # if home team exists and NOT in same season
-        elif game['HOME_TEAM'] in team_rats:
-            
-            # get initial rating
-            init_rat = get_init_rat(game['HOME_TEAM'], fbs_team_list)
-            
-            # reset home rating
-            home_rat = retain_weight*(team_rats[game['HOME_TEAM']][-1][1]-init_rat) + init_rat
-        
-        # if NOT home team exists
-        else:
-            
-            # get initial rating
-            init_rat = get_init_rat(game['HOME_TEAM'], fbs_team_list)
-            
-            # append home team to dict
-            team_rats[game['HOME_TEAM']] = [(date, init_rat, None, None)]
-            home_rat = team_rats[game['HOME_TEAM']][-1][1]
-        
-        # if away team exists and in same season
-        if game['AWAY_TEAM'] in team_rats and int(team_rats[game['AWAY_TEAM']][-1][0][0:4]) == int(date[0:4]):
-            
-            # get current home rating
-            away_rat = team_rats[game['AWAY_TEAM']][-1][1]
-        
-        # if away team exists and NOT in same season
-        elif game['AWAY_TEAM'] in team_rats:
-            
-            # get initial rating
-            init_rat = get_init_rat(game['AWAY_TEAM'], fbs_team_list)
-            
-            # reset away rating
-            away_rat = retain_weight*(team_rats[game['AWAY_TEAM']][-1][1]-init_rat) + init_rat
-        
-        # if NOT away team exists
-        else:
-            
-            # get initial rating
-            init_rat = get_init_rat(game['AWAY_TEAM'], fbs_team_list)
-            
-            # append away team to dict
-            team_rats[game['AWAY_TEAM']] = [(date, init_rat, None, None)]
-            away_rat = team_rats[game['AWAY_TEAM']][-1][1]
-        
-        # calc score margin from game
-        margin = game['HOME_POINTS'] - game['AWAY_POINTS']
-    
-        # calc new ratings
-        home_info, away_info = calc_new_rats(home_rat, away_rat, margin, K=perm[1], scaler=perm[2], log_base=perm[3])
-        home_rat_new, home_conf, home_act = home_info
-        away_rat_new, away_conf, away_act = away_info
-        
-        # append new ratings to dict
-        team_rats[game['HOME_TEAM']].append( (date, home_rat_new, home_conf, home_act) )
-        team_rats[game['AWAY_TEAM']].append( (date, away_rat_new, away_conf, away_act) )
+    team_rats = run_elo_sim(game_df, fbs_team_list,
+                            retain_weight=perm[0], K=perm[1], scaler=perm[2], MOV_base=perm[3])
         
     # ---------------------
     # ---Evaluate Models---

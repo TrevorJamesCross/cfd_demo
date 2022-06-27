@@ -16,9 +16,11 @@ import pandas as pd
 
 # import support libraries
 import requests as req
-from os.path import join
-from operator import itemgetter
 import json
+from os.path import join
+from tqdm import tqdm
+from operator import itemgetter
+from datetime import datetime
 
 # import visualization libraries
 import matplotlib.pyplot as plt
@@ -158,7 +160,7 @@ def calc_conf(rat_a, rat_b, scaler=400):
     return 1 / ( 1 + pow(10, (rat_b-rat_a)/scaler) )
 
 ## define function to calculate new Elo rating
-def calc_new_rats(home_rat, away_rat, margin, K=25, scaler=400, log_base=np.sqrt(15)):
+def calc_new_rats(home_rat, away_rat, margin, K=25, scaler=400, MOV_base=np.exp(1)):
     
     # calc home & away confidence
     home_conf = calc_conf(home_rat, away_rat, scaler=scaler)
@@ -176,7 +178,7 @@ def calc_new_rats(home_rat, away_rat, margin, K=25, scaler=400, log_base=np.sqrt
     away_act = 1 - home_act
     
     # calc margin of victory multiplier
-    mult = MOV_mult(home_rat, away_rat, margin, log_base=log_base)
+    mult = MOV_mult(home_rat, away_rat, margin, log_base=MOV_base)
     
     # calc new home & away ratings
     home_rat_new = home_rat + mult*K*(home_act - home_conf)
@@ -185,6 +187,85 @@ def calc_new_rats(home_rat, away_rat, margin, K=25, scaler=400, log_base=np.sqrt
     # return new ratings, confidence, and actualized value
     return (round(home_rat_new), home_conf, home_act), (round(away_rat_new), away_conf, away_act)
 
+
+## define function to run elo simulation
+def run_elo_sim(game_df, fbs_team_list, 
+                retain_weight=0.90, K=25, scaler=400, MOV_base=np.exp(1)):
+
+    # create dictionary to hold team Elo ratings
+    team_rats = dict()
+    
+    # iterate through games
+    for game_num, game in tqdm(game_df.iterrows(), desc='Running Elo Sim ', unit=' game', total=game_df.shape[0]):
+        
+        # parse current date
+        date = str(datetime.strptime(game['START_DATE'][0:10], '%Y-%m-%d').date())
+    
+        # if home team exists and in same season
+        if game['HOME_TEAM'] in team_rats and int(team_rats[game['HOME_TEAM']][-1][0][0:4]) == int(date[0:4]):
+            
+            # get current home rating
+            home_rat = team_rats[game['HOME_TEAM']][-1][1]
+        
+        # if home team exists and NOT in same season
+        elif game['HOME_TEAM'] in team_rats:
+            
+            # get initial rating
+            init_rat = get_init_rat(game['HOME_TEAM'], fbs_team_list)
+            
+            # reset home rating
+            home_rat = retain_weight*(team_rats[game['HOME_TEAM']][-1][1]-init_rat) + init_rat
+        
+        # if NOT home team exists
+        else:
+            
+            # get initial rating
+            init_rat = get_init_rat(game['HOME_TEAM'], fbs_team_list)
+            
+            # append home team to dict
+            team_rats[game['HOME_TEAM']] = [(date, init_rat, None, None)]
+            home_rat = team_rats[game['HOME_TEAM']][-1][1]
+        
+        # if away team exists and in same season
+        if game['AWAY_TEAM'] in team_rats and int(team_rats[game['AWAY_TEAM']][-1][0][0:4]) == int(date[0:4]):
+            
+            # get current home rating
+            away_rat = team_rats[game['AWAY_TEAM']][-1][1]
+        
+        # if away team exists and NOT in same season
+        elif game['AWAY_TEAM'] in team_rats:
+            
+            # get initial rating
+            init_rat = get_init_rat(game['AWAY_TEAM'], fbs_team_list)
+            
+            # reset away rating
+            away_rat = retain_weight*(team_rats[game['AWAY_TEAM']][-1][1]-init_rat) + init_rat
+        
+        # if NOT away team exists
+        else:
+            
+            # get initial rating
+            init_rat = get_init_rat(game['AWAY_TEAM'], fbs_team_list)
+            
+            # append away team to dict
+            team_rats[game['AWAY_TEAM']] = [(date, init_rat, None, None)]
+            away_rat = team_rats[game['AWAY_TEAM']][-1][1]
+        
+        # calc score margin from game
+        margin = game['HOME_POINTS'] - game['AWAY_POINTS']
+    
+        # calc new ratings
+        home_info, away_info = calc_new_rats(home_rat, away_rat, margin, K=K, scaler=scaler, MOV_base=MOV_base)
+        home_rat_new, home_conf, home_act = home_info
+        away_rat_new, away_conf, away_act = away_info
+        
+        # append new ratings to dict
+        team_rats[game['HOME_TEAM']].append( (date, home_rat_new, home_conf, home_act) )
+        team_rats[game['AWAY_TEAM']].append( (date, away_rat_new, away_conf, away_act) )
+        
+        # return dictionary of team Elo ratings
+        return team_rats
+    
 ## define function to plot ratings
 def plot_rats(team_rats, team_name):
     
