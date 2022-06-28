@@ -1,7 +1,7 @@
 """
 College Football Data Demo: Toolbox
 Author: Trevor Cross
-Last Updated: 06/27/22
+Last Updated: 06/28/22
 
 Series of functions used to extract and analyze data from collegefootballdata.com.
 """
@@ -13,7 +13,7 @@ Series of functions used to extract and analyze data from collegefootballdata.co
 # import standard libraries
 import numpy as np
 import pandas as pd
-
+ 
 # import support libraries
 import requests as req
 import json
@@ -21,6 +21,7 @@ from os.path import join
 from tqdm import tqdm
 from operator import itemgetter
 from datetime import datetime
+from scipy.stats import lognorm
 
 # import visualization libraries
 import matplotlib.pyplot as plt
@@ -152,19 +153,19 @@ def get_init_rat(team_name, fbs_team_list):
         return 1200
 
 ## define function to calculate margin of victory bonus
-def MOV_mult(home_rat, away_rat, margin, log_base=np.sqrt(15)):
-    return log_n(abs(margin)+1, n=log_base) * ( 2.2 / (abs(home_rat - away_rat)*10**-3 + 2.2) )
+def MOV_mult(home_rat, away_rat, margin):
+    return np.log(abs(margin)+1) * ( 2.2 / (abs(home_rat - away_rat)*10**-3 + 2.2) )
 
 ## define function to calculate Elo confidence
 def calc_conf(rat_a, rat_b, scaler=400):
     return 1 / ( 1 + pow(10, (rat_b-rat_a)/scaler) )
 
 ## define function to calculate new Elo rating
-def calc_new_rats(home_rat, away_rat, margin, K=25, scaler=400, MOV_base=np.exp(1)):
+def calc_new_rats(home_rat, away_rat, margin, K=25, scaler=400):
     
     # calc home & away confidence
     home_conf = calc_conf(home_rat, away_rat, scaler=scaler)
-    away_conf = calc_conf(away_rat, home_rat, scaler=scaler)
+    away_conf = 1 - home_conf
     
     # determine actualized home confidence
     if margin > 0:
@@ -178,7 +179,7 @@ def calc_new_rats(home_rat, away_rat, margin, K=25, scaler=400, MOV_base=np.exp(
     away_act = 1 - home_act
     
     # calc margin of victory multiplier
-    mult = MOV_mult(home_rat, away_rat, margin, log_base=MOV_base)
+    mult = MOV_mult(home_rat, away_rat, margin)
     
     # calc new home & away ratings
     home_rat_new = home_rat + mult*K*(home_act - home_conf)
@@ -190,9 +191,9 @@ def calc_new_rats(home_rat, away_rat, margin, K=25, scaler=400, MOV_base=np.exp(
 
 ## define function to run elo simulation
 def run_elo_sim(game_df, fbs_team_list, 
-                retain_weight=0.90, K=25, scaler=400, MOV_base=np.exp(1)):
+                retain_weight=0.90, K=25, scaler=400):
 
-    # create dictionary to hold team Elo ratings
+    # create dictionary to record team Elo ratings
     team_rats = dict()
     
     # iterate through games
@@ -214,7 +215,7 @@ def run_elo_sim(game_df, fbs_team_list,
             init_rat = get_init_rat(game['HOME_TEAM'], fbs_team_list)
             
             # reset home rating
-            home_rat = retain_weight*(team_rats[game['HOME_TEAM']][-1][1]-init_rat) + init_rat
+            home_rat = int(retain_weight*(team_rats[game['HOME_TEAM']][-1][1]-init_rat) + init_rat)
         
         # if NOT home team exists
         else:
@@ -239,7 +240,7 @@ def run_elo_sim(game_df, fbs_team_list,
             init_rat = get_init_rat(game['AWAY_TEAM'], fbs_team_list)
             
             # reset away rating
-            away_rat = retain_weight*(team_rats[game['AWAY_TEAM']][-1][1]-init_rat) + init_rat
+            away_rat = int(retain_weight*(team_rats[game['AWAY_TEAM']][-1][1]-init_rat) + init_rat)
         
         # if NOT away team exists
         else:
@@ -255,7 +256,7 @@ def run_elo_sim(game_df, fbs_team_list,
         margin = game['HOME_POINTS'] - game['AWAY_POINTS']
     
         # calc new ratings
-        home_info, away_info = calc_new_rats(home_rat, away_rat, margin, K=K, scaler=scaler, MOV_base=MOV_base)
+        home_info, away_info = calc_new_rats(home_rat, away_rat, margin, K=K, scaler=scaler)
         home_rat_new, home_conf, home_act = home_info
         away_rat_new, away_conf, away_act = away_info
         
@@ -263,8 +264,8 @@ def run_elo_sim(game_df, fbs_team_list,
         team_rats[game['HOME_TEAM']].append( (date, home_rat_new, home_conf, home_act) )
         team_rats[game['AWAY_TEAM']].append( (date, away_rat_new, away_conf, away_act) )
         
-        # return dictionary of team Elo ratings
-        return team_rats
+    # return dictionary of team Elo ratings
+    return team_rats
     
 ## define function to plot ratings
 def plot_rats(team_rats, team_name):
@@ -292,6 +293,63 @@ def plot_rats(team_rats, team_name):
                 season_start.append(date)
                 
         plt.xticks(season_start, rotation=45)
+
+# ----------------------------------------
+# ---Define Record Prediction Functions---
+# ----------------------------------------
+
+## define a function to fit MOV data
+def fit_MOV_data(game_df):
+    
+    # get MOV data
+    MOV_data = abs(game_df['HOME_POINTS'] - game_df['AWAY_POINTS'])
+    
+    # get lognormal parameters
+    s, loc, scale = lognorm.fit(MOV_data)
+    
+    # generate lognormal distribution
+    x = np.arange(0, max(MOV_data), 1)
+    ## for some (dumb) reason, lognorm.pdf does not produce normalized vaues
+    y = lognorm.pdf(x, s, loc, scale)
+    y /= np.sum(y)
+    
+    # return x and y values
+    return x, y
+
+## define function to sample game results
+def sample_game_results(home_rat, away_rat, game_df, K=25, scaler=400):
+    
+    # calc confidence
+    home_conf = calc_conf(home_rat, away_rat, scaler)
+    away_conf = 1 - home_conf
+    
+    # generate random number
+    rand_num = np.random.uniform(low=0, high=1)
+    
+    # determine victor
+    if home_conf > rand_num:
+        home_act = 1
+    else:
+        home_act = 0
+    
+    # calc away actualized value
+    away_act = 1 - home_act
+    
+    # calc MOV distribution
+    x, y = fit_MOV_data(game_df)
+    
+    # sample margin from distribution
+    margin = int(np.random.choice(x, p=y))
+    
+    # calc MOV multiplier
+    mult = MOV_mult(home_rat, away_rat, margin)
+    
+    # calc new home & away ratings
+    home_rat_new = home_rat + mult*K*(home_act - home_conf)
+    away_rat_new = away_rat + mult*K*(away_act - away_conf)
+    
+    # return new ratings, confidence, and actualized value
+    return (round(home_rat_new), home_conf, home_act), (round(away_rat_new), away_conf, away_act)
     
 # ----------------------------
 # ---Define Other Functions---
@@ -347,3 +405,7 @@ def cart_prod(list_of_lists):
 def dict_to_json(my_dict, file_path):
     with open(file_path, "w+") as file:
         json.dump(my_dict, file)
+
+def json_to_dict(file_path):
+    with open(file_path) as file:
+        return json.load(file)

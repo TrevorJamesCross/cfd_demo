@@ -1,7 +1,7 @@
 """
 College Football Data Demo: Elo Rating Evaluation
 Author: Trevor Cross
-Last Updated: 06/27/22
+Last Updated: 06/28/22
 
 Simuates NCAAF games using an Elo rating algorithm and compares the results 
 against a naive method. Incorporates parameter tuning.
@@ -19,7 +19,6 @@ import pandas as pd
 from os.path import expanduser, join
 import sys
 from tqdm import tqdm
-from datetime import datetime
 from operator import itemgetter
 from sklearn.metrics import log_loss, accuracy_score
 
@@ -41,7 +40,7 @@ conn = connect_to_SF(json_creds_path)
 # obtain game data
 game_query = """
              select start_date, home_team, home_points, away_team, away_points from games
-             where season >= 1969 and season < 2000
+             where season >= 1970 and season < 2021
              order by start_date
              """
                 
@@ -101,12 +100,11 @@ for game_num, game in tqdm(game_df.iterrows(), desc='Running Naive Sim ', unit='
 
 # define parameter iterations
 retain_weights = [0.85]
-Ks = [30]
-scalers = [350]
-MOV_base = [np.exp(1)]
+Ks = [25]
+scalers = [300]
 
 # get parameter permutations
-perms = cart_prod([retain_weights, Ks, scalers, MOV_base])
+perms = cart_prod([retain_weights, Ks, scalers])
 
 # store perm results
 results = []
@@ -115,7 +113,7 @@ results = []
 for perm in perms:
     
     team_rats = run_elo_sim(game_df, fbs_team_list,
-                            retain_weight=perm[0], K=perm[1], scaler=perm[2], MOV_base=perm[3])
+                            retain_weight=perm[0], K=perm[1], scaler=perm[2])
         
     # ---------------------
     # ---Evaluate Models---
@@ -150,34 +148,34 @@ for perm in perms:
                 del naive_preds[index]
                 del naive_acts[index]
     
-    # split train and test data (Elo)
-    train_preds, test_preds = preds[:int(0.7*len(preds))], preds[int(0.7*len(preds)):]
-    train_acts, test_acts = acts[:int(0.7*len(acts))], acts[int(0.7*len(acts)):]
+    # split tune and test data (Elo)
+    tune_preds, test_preds = preds[:int(0.6*len(preds))], preds[int(0.6*len(preds)):]
+    tune_acts, test_acts = acts[:int(0.6*len(acts))], acts[int(0.6*len(acts)):]
     
-    # split train and test data (naive)
-    naive_train_preds, naive_test_preds = naive_preds[:int(0.7*len(naive_preds))], naive_preds[int(0.7*len(naive_preds)):]
-    naive_train_acts, naive_test_acts = naive_acts[:int(0.7*len(naive_acts))], naive_acts[int(0.7*len(naive_acts)):]
+    # split tune and test data (naive)
+    naive_tune_preds, naive_test_preds = naive_preds[:int(0.6*len(naive_preds))], naive_preds[int(0.6*len(naive_preds)):]
+    naive_tune_acts, naive_test_acts = naive_acts[:int(0.6*len(naive_acts))], naive_acts[int(0.6*len(naive_acts)):]
     
-    # calc log loss and accuracy of train data
+    # calc log loss and accuracy of tune data
     if len(perms) > 0:
         
         print("\n >>> perm: {}".format(perm))
         
-        train_loss = log_loss(train_acts, train_preds)
-        print("\n >>> Log Loss (Train Data): {}".format(train_loss))
+        tune_loss = log_loss(tune_acts, tune_preds)
+        print("\n >>> Log Loss (Tune Data): {}".format(tune_loss))
         
-        naive_train_loss = log_loss(naive_train_acts, naive_train_preds)
-        print(" >>> Naive Log Loss (Train Data): {}".format(naive_train_loss))
+        naive_tune_loss = log_loss(naive_tune_acts, naive_tune_preds)
+        print(" >>> Naive Log Loss (Tune Data): {}".format(naive_tune_loss))
         
-        train_acc = accuracy_score(train_acts, list(map(round,train_preds)))
-        print("\n >>> Accuracy (Train Data): {}".format(train_acc))
+        tune_acc = accuracy_score(tune_acts, list(map(round,tune_preds)))
+        print("\n >>> Accuracy (Tune Data): {}".format(tune_acc))
         
-        naive_train_acc = accuracy_score(naive_train_acts, list(map(round,naive_train_preds)))
-        print(" >>> Naive Accuracy (Train Data): {}".format(naive_train_acc))
+        naive_tune_acc = accuracy_score(naive_tune_acts, list(map(round,naive_tune_preds)))
+        print(" >>> Naive Accuracy (Tune Data): {}".format(naive_tune_acc))
         
         print("\n")
         
-        results.append( (perm, train_loss, train_acc) )
+        results.append( (perm, tune_loss, tune_acc) )
     
     # calc log loss and acc of test data
     if len(perms) == 1:
