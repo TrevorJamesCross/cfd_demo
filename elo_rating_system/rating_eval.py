@@ -64,8 +64,8 @@ conn.close()
 naive_preds = []
 naive_acts = []
 
-# test naive strat
-for game_num, game in tqdm(game_df.iterrows(), desc='Running Naive Sim ', unit=' game', total=game_df.shape[0]):
+# run naive strat
+for game_num, game in tqdm(game_df.iterrows(), desc='Running Naive Sim ', unit='game', total=game_df.shape[0]):
         
     # check if home team is fbs
     if game['HOME_TEAM'] in fbs_team_list and game['AWAY_TEAM'] not in fbs_team_list:

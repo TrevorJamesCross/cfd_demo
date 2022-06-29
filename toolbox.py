@@ -1,7 +1,7 @@
 """
 College Football Data Demo: Toolbox
 Author: Trevor Cross
-Last Updated: 06/28/22
+Last Updated: 06/29/22
 
 Series of functions used to extract and analyze data from collegefootballdata.com.
 """
@@ -13,7 +13,10 @@ Series of functions used to extract and analyze data from collegefootballdata.co
 # import standard libraries
 import numpy as np
 import pandas as pd
- 
+
+# import performance library
+from numba import jit
+
 # import support libraries
 import requests as req
 import json
@@ -153,14 +156,17 @@ def get_init_rat(team_name, fbs_team_list):
         return 1200
 
 ## define function to calculate margin of victory bonus
+jit(nopython=True)
 def MOV_mult(home_rat, away_rat, margin):
     return np.log(abs(margin)+1) * ( 2.2 / (abs(home_rat - away_rat)*10**-3 + 2.2) )
 
 ## define function to calculate Elo confidence
+jit(nopython=True)
 def calc_conf(rat_a, rat_b, scaler=400):
     return 1 / ( 1 + pow(10, (rat_b-rat_a)/scaler) )
 
 ## define function to calculate new Elo rating
+jit(nopython=True)
 def calc_new_rats(home_rat, away_rat, margin, K=25, scaler=400):
     
     # calc home & away confidence
@@ -197,7 +203,7 @@ def run_elo_sim(game_df, fbs_team_list,
     team_rats = dict()
     
     # iterate through games
-    for game_num, game in tqdm(game_df.iterrows(), desc='Running Elo Sim ', unit=' game', total=game_df.shape[0]):
+    for game_num, game in tqdm(game_df.iterrows(), desc='Running Elo Sim ', unit='game', total=game_df.shape[0]):
         
         # parse current date
         date = str(datetime.strptime(game['START_DATE'][0:10], '%Y-%m-%d').date())
@@ -307,17 +313,19 @@ def fit_MOV_data(game_df):
     # get lognormal parameters
     s, loc, scale = lognorm.fit(MOV_data)
     
-    # generate lognormal distribution
+    # generate lognormal distribution of scores
     x = np.arange(0, max(MOV_data), 1)
+    
     ## for some (dumb) reason, lognorm.pdf does not produce normalized vaues
     y = lognorm.pdf(x, s, loc, scale)
     y /= np.sum(y)
     
     # return x and y values
-    return x, y
+    return (x,y)
 
 ## define function to sample game results
-def sample_game_results(home_rat, away_rat, game_df, K=25, scaler=400):
+jit(nopython=True)
+def sample_game_results(home_rat, away_rat, margin_dist, K=25, scaler=400):
     
     # calc confidence
     home_conf = calc_conf(home_rat, away_rat, scaler)
@@ -335,11 +343,8 @@ def sample_game_results(home_rat, away_rat, game_df, K=25, scaler=400):
     # calc away actualized value
     away_act = 1 - home_act
     
-    # calc MOV distribution
-    x, y = fit_MOV_data(game_df)
-    
     # sample margin from distribution
-    margin = int(np.random.choice(x, p=y))
+    margin = round_up(np.random.choice(margin_dist[0], p=margin_dist[1]))
     
     # calc MOV multiplier
     mult = MOV_mult(home_rat, away_rat, margin)
@@ -351,11 +356,85 @@ def sample_game_results(home_rat, away_rat, game_df, K=25, scaler=400):
     # return new ratings, confidence, and actualized value
     return (round(home_rat_new), home_conf, home_act), (round(away_rat_new), away_conf, away_act)
     
+
+## define a function to run record prediction for a season
+def run_season_sim(season, game_df, fbs_team_list, team_rats, K=25, scaler=400):
+    
+    # create dictionary to record hot team ratings
+    team_rats_hot = dict()
+    
+    # filter game_df by season
+    game_df_hot = game_df.loc[game_df['START_DATE'].str.startswith(str(season))]
+    
+    # calc prob distribution of MOV
+    game_df_cold = game_df.loc[game_df['START_DATE'].str[:4].astype(int) < season]
+    margin_dist = fit_MOV_data(game_df_cold)
+    
+    # iterate games
+    for game_num, game in tqdm(game_df_hot.iterrows(), desc='Season {} '.format(season), unit='game', total=game_df_hot.shape[0]):
+        
+        # parse current date
+        date = str(datetime.strptime(game['START_DATE'][0:10], '%Y-%m-%d').date())
+        
+        # if home team exists
+        if game['HOME_TEAM'] in team_rats_hot:
+            
+            # get current home rating
+            home_rat = team_rats_hot[game['HOME_TEAM']][-1][1]
+        
+        # if NOT home team exists
+        else:
+            
+            # get starting rating for the season
+            init_items = next(items[1:] for items in team_rats[game['HOME_TEAM']] if items[0][:4]==str(season))
+            
+            # get home_rat
+            home_rat = init_items[0]
+            
+            # append home team to dict
+            team_rats_hot[game['HOME_TEAM']] = [(date, init_items[0], init_items[1], init_items[2])]
+            
+        # if home team exists
+        if game['AWAY_TEAM'] in team_rats_hot:
+            
+            # get current home rating
+            away_rat = team_rats_hot[game['AWAY_TEAM']][-1][1]
+        
+        # if NOT away team exists
+        else:
+            
+            # get starting rating for the season
+            init_items = next(items[1:] for items in team_rats[game['AWAY_TEAM']] if items[0][:4]==str(season))
+            
+            # get away_rat
+            away_rat = init_items[0]
+            
+            # append away team to dict
+            team_rats_hot[game['AWAY_TEAM']] = [(date, init_items[0], init_items[1], init_items[2])]
+            
+        # sample game results
+        home_info, away_info = sample_game_results(home_rat, away_rat, margin_dist, K=K, scaler=scaler)
+        home_rat_new, home_conf, home_act = home_info
+        away_rat_new, away_conf, away_act = away_info
+        
+        # append new ratings to dict
+        team_rats_hot[game['HOME_TEAM']].append( (date, home_rat_new, home_conf, home_act) )
+        team_rats_hot[game['AWAY_TEAM']].append( (date, away_rat_new, away_conf, away_act) )
+        
+    # return dictionary of team Elo ratings
+    return team_rats_hot
+
 # ----------------------------
 # ---Define Other Functions---
 # ----------------------------
 
+## define a function to round numbers up
+jit(nopython=True)
+def round_up(x):
+    return int(x) + (x % 1 > 0)
+
 ## define a function to calculate log base n
+jit(nopython=True)
 def log_n(x, n=10):
     return np.log(x) / np.log(n)
 
@@ -365,6 +444,7 @@ def disp_conf_mat(preds, acts):
     ConfusionMatrixDisplay(conf_mat).plot()
     
 ## define a function to take the cartesian product of an arbitrary number of lists
+jit(nopython=True)
 def cart_prod(list_of_lists):
     
     # check argument is list of lists
