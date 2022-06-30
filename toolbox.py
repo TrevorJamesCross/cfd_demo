@@ -1,7 +1,7 @@
 """
 College Football Data Demo: Toolbox
 Author: Trevor Cross
-Last Updated: 06/29/22
+Last Updated: 06/30/22
 
 Series of functions used to extract and analyze data from collegefootballdata.com.
 """
@@ -209,7 +209,7 @@ def run_elo_sim(game_df, fbs_team_list,
         date = str(datetime.strptime(game['START_DATE'][0:10], '%Y-%m-%d').date())
     
         # if home team exists and in same season
-        if game['HOME_TEAM'] in team_rats and int(team_rats[game['HOME_TEAM']][-1][0][0:4]) == int(date[0:4]):
+        if game['HOME_TEAM'] in team_rats and int(team_rats[game['HOME_TEAM']][-1][0][:4]) == int(date[:4]):
             
             # get current home rating
             home_rat = team_rats[game['HOME_TEAM']][-1][1]
@@ -234,7 +234,7 @@ def run_elo_sim(game_df, fbs_team_list,
             home_rat = team_rats[game['HOME_TEAM']][-1][1]
         
         # if away team exists and in same season
-        if game['AWAY_TEAM'] in team_rats and int(team_rats[game['AWAY_TEAM']][-1][0][0:4]) == int(date[0:4]):
+        if game['AWAY_TEAM'] in team_rats and int(team_rats[game['AWAY_TEAM']][-1][0][:4]) == int(date[:4]):
             
             # get current home rating
             away_rat = team_rats[game['AWAY_TEAM']][-1][1]
@@ -294,8 +294,8 @@ def plot_rats(team_rats, team_name):
         seasons = []
         season_start = []
         for date in dates_list:
-            if date[0:4] not in seasons:
-                seasons.append(date[0:4])
+            if date[:4] not in seasons:
+                seasons.append(date[:4])
                 season_start.append(date)
                 
         plt.xticks(season_start, rotation=45)
@@ -361,7 +361,7 @@ def sample_game_results(home_rat, away_rat, margin_dist, K=25, scaler=400):
 def run_season_sim(season, game_df, fbs_team_list, team_rats, K=25, scaler=400):
     
     # create dictionary to record hot team ratings
-    team_rats_hot = dict()
+    list_of_sims = dict()
     
     # filter game_df by season
     game_df_hot = game_df.loc[game_df['START_DATE'].str.startswith(str(season))]
@@ -371,46 +371,40 @@ def run_season_sim(season, game_df, fbs_team_list, team_rats, K=25, scaler=400):
     margin_dist = fit_MOV_data(game_df_cold)
     
     # iterate games
-    for game_num, game in tqdm(game_df_hot.iterrows(), desc='Season {} '.format(season), unit='game', total=game_df_hot.shape[0]):
+    for game_num, game in game_df_hot.iterrows():
         
         # parse current date
         date = str(datetime.strptime(game['START_DATE'][0:10], '%Y-%m-%d').date())
         
         # if home team exists
-        if game['HOME_TEAM'] in team_rats_hot:
+        if game['HOME_TEAM'] in list_of_sims:
             
             # get current home rating
-            home_rat = team_rats_hot[game['HOME_TEAM']][-1][1]
+            home_rat = list_of_sims[game['HOME_TEAM']][-1][1]
         
         # if NOT home team exists
         else:
             
             # get starting rating for the season
-            init_items = next(items[1:] for items in team_rats[game['HOME_TEAM']] if items[0][:4]==str(season))
-            
-            # get home_rat
-            home_rat = init_items[0]
+            home_rat = next(team_rats[game['HOME_TEAM']][items_num-1][1] for items_num, items in enumerate(team_rats[game['HOME_TEAM']]) if items[0][:4]==str(season))
             
             # append home team to dict
-            team_rats_hot[game['HOME_TEAM']] = [(date, init_items[0], init_items[1], init_items[2])]
+            list_of_sims[game['HOME_TEAM']] = []
             
         # if home team exists
-        if game['AWAY_TEAM'] in team_rats_hot:
+        if game['AWAY_TEAM'] in list_of_sims:
             
             # get current home rating
-            away_rat = team_rats_hot[game['AWAY_TEAM']][-1][1]
+            away_rat = list_of_sims[game['AWAY_TEAM']][-1][1]
         
         # if NOT away team exists
         else:
             
             # get starting rating for the season
-            init_items = next(items[1:] for items in team_rats[game['AWAY_TEAM']] if items[0][:4]==str(season))
-            
-            # get away_rat
-            away_rat = init_items[0]
+            away_rat = next(team_rats[game['AWAY_TEAM']][items_num-1][1] for items_num, items in enumerate(team_rats[game['AWAY_TEAM']]) if items[0][:4]==str(season))
             
             # append away team to dict
-            team_rats_hot[game['AWAY_TEAM']] = [(date, init_items[0], init_items[1], init_items[2])]
+            list_of_sims[game['AWAY_TEAM']] = []
             
         # sample game results
         home_info, away_info = sample_game_results(home_rat, away_rat, margin_dist, K=K, scaler=scaler)
@@ -418,11 +412,11 @@ def run_season_sim(season, game_df, fbs_team_list, team_rats, K=25, scaler=400):
         away_rat_new, away_conf, away_act = away_info
         
         # append new ratings to dict
-        team_rats_hot[game['HOME_TEAM']].append( (date, home_rat_new, home_conf, home_act) )
-        team_rats_hot[game['AWAY_TEAM']].append( (date, away_rat_new, away_conf, away_act) )
+        list_of_sims[game['HOME_TEAM']].append( (date, home_rat_new, home_conf, home_act) )
+        list_of_sims[game['AWAY_TEAM']].append( (date, away_rat_new, away_conf, away_act) )
         
     # return dictionary of team Elo ratings
-    return team_rats_hot
+    return list_of_sims
 
 # ----------------------------
 # ---Define Other Functions---
@@ -486,6 +480,7 @@ def dict_to_json(my_dict, file_path):
     with open(file_path, "w+") as file:
         json.dump(my_dict, file)
 
+## define function to load local JSON file as Python dict
 def json_to_dict(file_path):
     with open(file_path) as file:
         return json.load(file)
