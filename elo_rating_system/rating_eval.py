@@ -1,7 +1,7 @@
 """
 College Football Data Demo: Elo Rating Evaluation
 Author: Trevor Cross
-Last Updated: 06/28/22
+Last Updated: 07/01/22
 
 Simuates NCAAF games using an Elo rating algorithm and compares the results 
 against a naive method. Incorporates parameter tuning.
@@ -65,14 +65,14 @@ naive_preds = []
 naive_acts = []
 
 # run naive strat
-for game_num, game in tqdm(game_df.iterrows(), desc='Running Naive Sim ', unit='game', total=game_df.shape[0]):
+for game in tqdm(game_df.itertuples(), desc='Running Naive Sim ', unit='game', total=game_df.shape[0]):
         
     # check if home team is fbs
-    if game['HOME_TEAM'] in fbs_team_list and game['AWAY_TEAM'] not in fbs_team_list:
+    if game[2] in fbs_team_list and game[4] not in fbs_team_list:
         home_conf = 0.75
         
     # check if away team is fbs
-    elif game["AWAY_TEAM"] in fbs_team_list and game['HOME_TEAM'] not in fbs_team_list:
+    elif game[4] in fbs_team_list and game[2] not in fbs_team_list:
         home_conf = 0.25
         
     # assume home field advantage
@@ -80,7 +80,7 @@ for game_num, game in tqdm(game_df.iterrows(), desc='Running Naive Sim ', unit='
         home_conf = 0.55
     
     # calc margin
-    margin = game['HOME_POINTS'] - game['AWAY_POINTS']
+    margin = game[3] - game[5]
     
     # determine victor
     if margin > 0:

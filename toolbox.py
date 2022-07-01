@@ -1,7 +1,7 @@
 """
 College Football Data Demo: Toolbox
 Author: Trevor Cross
-Last Updated: 06/30/22
+Last Updated: 07/01/22
 
 Series of functions used to extract and analyze data from collegefootballdata.com.
 """
@@ -13,9 +13,6 @@ Series of functions used to extract and analyze data from collegefootballdata.co
 # import standard libraries
 import numpy as np
 import pandas as pd
-
-# import performance library
-from numba import jit
 
 # import support libraries
 import requests as req
@@ -156,17 +153,14 @@ def get_init_rat(team_name, fbs_team_list):
         return 1200
 
 ## define function to calculate margin of victory bonus
-jit(nopython=True)
 def MOV_mult(home_rat, away_rat, margin):
     return np.log(abs(margin)+1) * ( 2.2 / (abs(home_rat - away_rat)*10**-3 + 2.2) )
 
 ## define function to calculate Elo confidence
-jit(nopython=True)
 def calc_conf(rat_a, rat_b, scaler=400):
     return 1 / ( 1 + pow(10, (rat_b-rat_a)/scaler) )
 
 ## define function to calculate new Elo rating
-jit(nopython=True)
 def calc_new_rats(home_rat, away_rat, margin, K=25, scaler=400):
     
     # calc home & away confidence
@@ -203,63 +197,63 @@ def run_elo_sim(game_df, fbs_team_list,
     team_rats = dict()
     
     # iterate through games
-    for game_num, game in tqdm(game_df.iterrows(), desc='Running Elo Sim ', unit='game', total=game_df.shape[0]):
+    for game in tqdm(game_df.itertuples(), desc='Running Elo Sim ', unit=' games', total=game_df.shape[0]):
         
         # parse current date
-        date = str(datetime.strptime(game['START_DATE'][0:10], '%Y-%m-%d').date())
+        date = str(datetime.strptime(game[1][0:10], '%Y-%m-%d').date())
     
         # if home team exists and in same season
-        if game['HOME_TEAM'] in team_rats and int(team_rats[game['HOME_TEAM']][-1][0][:4]) == int(date[:4]):
+        if game[2] in team_rats and int(team_rats[game[2]][-1][0][:4]) == int(date[:4]):
             
             # get current home rating
-            home_rat = team_rats[game['HOME_TEAM']][-1][1]
+            home_rat = team_rats[game[2]][-1][1]
         
         # if home team exists and NOT in same season
-        elif game['HOME_TEAM'] in team_rats:
+        elif game[2] in team_rats:
             
             # get initial rating
-            init_rat = get_init_rat(game['HOME_TEAM'], fbs_team_list)
+            init_rat = get_init_rat(game[2], fbs_team_list)
             
             # reset home rating
-            home_rat = int(retain_weight*(team_rats[game['HOME_TEAM']][-1][1]-init_rat) + init_rat)
+            home_rat = int(retain_weight*(team_rats[game[2]][-1][1]-init_rat) + init_rat)
         
         # if NOT home team exists
         else:
             
             # get initial rating
-            init_rat = get_init_rat(game['HOME_TEAM'], fbs_team_list)
+            init_rat = get_init_rat(game[2], fbs_team_list)
             
             # append home team to dict
-            team_rats[game['HOME_TEAM']] = [(date, init_rat, None, None)]
-            home_rat = team_rats[game['HOME_TEAM']][-1][1]
+            team_rats[game[2]] = [(date, init_rat, None, None)]
+            home_rat = team_rats[game[2]][-1][1]
         
         # if away team exists and in same season
-        if game['AWAY_TEAM'] in team_rats and int(team_rats[game['AWAY_TEAM']][-1][0][:4]) == int(date[:4]):
+        if game[4] in team_rats and int(team_rats[game[4]][-1][0][:4]) == int(date[:4]):
             
             # get current home rating
-            away_rat = team_rats[game['AWAY_TEAM']][-1][1]
+            away_rat = team_rats[game[4]][-1][1]
         
         # if away team exists and NOT in same season
-        elif game['AWAY_TEAM'] in team_rats:
+        elif game[4] in team_rats:
             
             # get initial rating
-            init_rat = get_init_rat(game['AWAY_TEAM'], fbs_team_list)
+            init_rat = get_init_rat(game[4], fbs_team_list)
             
             # reset away rating
-            away_rat = int(retain_weight*(team_rats[game['AWAY_TEAM']][-1][1]-init_rat) + init_rat)
+            away_rat = int(retain_weight*(team_rats[game[4]][-1][1]-init_rat) + init_rat)
         
         # if NOT away team exists
         else:
             
             # get initial rating
-            init_rat = get_init_rat(game['AWAY_TEAM'], fbs_team_list)
+            init_rat = get_init_rat(game[4], fbs_team_list)
             
             # append away team to dict
-            team_rats[game['AWAY_TEAM']] = [(date, init_rat, None, None)]
-            away_rat = team_rats[game['AWAY_TEAM']][-1][1]
+            team_rats[game[4]] = [(date, init_rat, None, None)]
+            away_rat = team_rats[game[4]][-1][1]
         
         # calc score margin from game
-        margin = game['HOME_POINTS'] - game['AWAY_POINTS']
+        margin = game[3] - game[5]
     
         # calc new ratings
         home_info, away_info = calc_new_rats(home_rat, away_rat, margin, K=K, scaler=scaler)
@@ -267,8 +261,8 @@ def run_elo_sim(game_df, fbs_team_list,
         away_rat_new, away_conf, away_act = away_info
         
         # append new ratings to dict
-        team_rats[game['HOME_TEAM']].append( (date, home_rat_new, home_conf, home_act) )
-        team_rats[game['AWAY_TEAM']].append( (date, away_rat_new, away_conf, away_act) )
+        team_rats[game[2]].append( (date, home_rat_new, home_conf, home_act) )
+        team_rats[game[4]].append( (date, away_rat_new, away_conf, away_act) )
         
     # return dictionary of team Elo ratings
     return team_rats
@@ -324,7 +318,6 @@ def fit_MOV_data(game_df):
     return (x,y)
 
 ## define function to sample game results
-jit(nopython=True)
 def sample_game_results(home_rat, away_rat, margin_dist, K=25, scaler=400):
     
     # calc confidence
@@ -358,10 +351,10 @@ def sample_game_results(home_rat, away_rat, margin_dist, K=25, scaler=400):
     
 
 ## define a function to run record prediction for a season
-def run_season_sim(season, game_df, fbs_team_list, team_rats, K=25, scaler=400):
+def run_season_sim(season, game_df, team_rats, K=25, scaler=400):
     
     # create dictionary to record hot team ratings
-    list_of_sims = dict()
+    sim_dict = dict()
     
     # filter game_df by season
     game_df_hot = game_df.loc[game_df['START_DATE'].str.startswith(str(season))]
@@ -371,40 +364,40 @@ def run_season_sim(season, game_df, fbs_team_list, team_rats, K=25, scaler=400):
     margin_dist = fit_MOV_data(game_df_cold)
     
     # iterate games
-    for game_num, game in game_df_hot.iterrows():
+    for game in game_df_hot.itertuples():
         
         # parse current date
-        date = str(datetime.strptime(game['START_DATE'][0:10], '%Y-%m-%d').date())
+        date = str(datetime.strptime(game[1][0:10], '%Y-%m-%d').date())
         
         # if home team exists
-        if game['HOME_TEAM'] in list_of_sims:
+        if game[2] in sim_dict:
             
             # get current home rating
-            home_rat = list_of_sims[game['HOME_TEAM']][-1][1]
+            home_rat = sim_dict[game[2]][-1][1]
         
         # if NOT home team exists
         else:
             
             # get starting rating for the season
-            home_rat = next(team_rats[game['HOME_TEAM']][items_num-1][1] for items_num, items in enumerate(team_rats[game['HOME_TEAM']]) if items[0][:4]==str(season))
+            home_rat = next(team_rats[game[2]][items_num-1][1] for items_num, items in enumerate(team_rats[game[2]]) if items[0][:4]==str(season))
             
             # append home team to dict
-            list_of_sims[game['HOME_TEAM']] = []
+            sim_dict[game[2]] = []
             
         # if home team exists
-        if game['AWAY_TEAM'] in list_of_sims:
+        if game[4] in sim_dict:
             
             # get current home rating
-            away_rat = list_of_sims[game['AWAY_TEAM']][-1][1]
+            away_rat = sim_dict[game[4]][-1][1]
         
         # if NOT away team exists
         else:
             
             # get starting rating for the season
-            away_rat = next(team_rats[game['AWAY_TEAM']][items_num-1][1] for items_num, items in enumerate(team_rats[game['AWAY_TEAM']]) if items[0][:4]==str(season))
+            away_rat = next(team_rats[game[4]][items_num-1][1] for items_num, items in enumerate(team_rats[game[4]]) if items[0][:4]==str(season))
             
             # append away team to dict
-            list_of_sims[game['AWAY_TEAM']] = []
+            sim_dict[game[4]] = []
             
         # sample game results
         home_info, away_info = sample_game_results(home_rat, away_rat, margin_dist, K=K, scaler=scaler)
@@ -412,23 +405,28 @@ def run_season_sim(season, game_df, fbs_team_list, team_rats, K=25, scaler=400):
         away_rat_new, away_conf, away_act = away_info
         
         # append new ratings to dict
-        list_of_sims[game['HOME_TEAM']].append( (date, home_rat_new, home_conf, home_act) )
-        list_of_sims[game['AWAY_TEAM']].append( (date, away_rat_new, away_conf, away_act) )
+        sim_dict[game[2]].append( (date, home_rat_new, home_conf, home_act) )
+        sim_dict[game[4]].append( (date, away_rat_new, away_conf, away_act) )
         
     # return dictionary of team Elo ratings
-    return list_of_sims
+    return sim_dict
+
+## define a function to evaluate predicted season record for a given team
+def eval_rec(agg_dict, true_rec_dict, team_name):
+    game_preds = np.array(list(map(round, map(itemgetter(2), agg_dict[team_name]))))
+    true_acts = np.array(list(map(itemgetter(1), true_rec_dict[team_name])))
+    
+    return game_preds == true_acts
 
 # ----------------------------
 # ---Define Other Functions---
 # ----------------------------
 
 ## define a function to round numbers up
-jit(nopython=True)
 def round_up(x):
     return int(x) + (x % 1 > 0)
 
 ## define a function to calculate log base n
-jit(nopython=True)
 def log_n(x, n=10):
     return np.log(x) / np.log(n)
 
@@ -438,7 +436,6 @@ def disp_conf_mat(preds, acts):
     ConfusionMatrixDisplay(conf_mat).plot()
     
 ## define a function to take the cartesian product of an arbitrary number of lists
-jit(nopython=True)
 def cart_prod(list_of_lists):
     
     # check argument is list of lists

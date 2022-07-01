@@ -1,7 +1,7 @@
 """
 College Football Data Demo: Season Record Evaluation
 Author: Trevor Cross
-Last Updated: 06/30/22
+Last Updated: 07/01/22
 
 Simuates NCAAF games using an Elo rating algorithm to predict end season
 records.
@@ -22,8 +22,7 @@ from multiprocessing import Pool
 from os.path import expanduser, join
 import sys
 from operator import itemgetter
-from time import time
-import json
+from tqdm import tqdm
 from sklearn.metrics import log_loss, accuracy_score
 
 # import toolbox functions
@@ -75,16 +74,16 @@ season = 2015
 
 # define Elo rating algorithm parameters
 K = 25
-scaler = 350
+scaler = 300
 
 # run season simulations
 num_sims = 1000
 
-start_time = time()
-with Pool(2) as p:
-    print("\n Running Season Sim...")
-    list_of_sims = list(p.starmap(run_season_sim, [(season, game_df, fbs_team_list, team_rats, K, scaler)]*num_sims))
-print("\n >>> Time Elapsed: {}".format(time()-start_time))
+pool = Pool()
+func_inputs = [(season, game_df, team_rats, K, scaler)]*num_sims
+
+with Pool() as pool:
+    list_of_sims = pool.starmap(run_season_sim, tqdm(func_inputs, desc="Running Sims ", unit=' sims'))
 
 # "invert" list_of_sims (list of dicts -> dict of lists)
 team_rats_hot = dict()
@@ -137,3 +136,11 @@ print("\n >>> Log Loss: {}".format(loss))
         
 acc = accuracy_score(true_acts, list(map(round, pred_acts)))
 print("\n >>> Accuracy: {}".format(acc))
+
+# --------------------------
+# ---Evaluate Team Record---
+# --------------------------
+
+# evaluate Wisconsin's season record
+wisco_rec = eval_rec(agg_dict, true_rec_dict, 'Wisconsin')
+print(wisco_rec)
