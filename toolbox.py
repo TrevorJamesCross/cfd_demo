@@ -1,7 +1,7 @@
 """
 College Football Data Demo: Toolbox
 Author: Trevor Cross
-Last Updated: 07/01/22
+Last Updated: 07/05/22
 
 Series of functions used to extract and analyze data from collegefootballdata.com.
 """
@@ -318,7 +318,7 @@ def fit_MOV_data(game_df):
     return (x,y)
 
 ## define function to sample game results
-def sample_game_results(home_rat, away_rat, margin_dist, K=25, scaler=400):
+def sample_game_results(home_rat, away_rat, margin=7, K=25, scaler=400):
     
     # calc confidence
     home_conf = calc_conf(home_rat, away_rat, scaler)
@@ -336,9 +336,6 @@ def sample_game_results(home_rat, away_rat, margin_dist, K=25, scaler=400):
     # calc away actualized value
     away_act = 1 - home_act
     
-    # sample margin from distribution
-    margin = round_up(np.random.choice(margin_dist[0], p=margin_dist[1]))
-    
     # calc MOV multiplier
     mult = MOV_mult(home_rat, away_rat, margin)
     
@@ -351,20 +348,13 @@ def sample_game_results(home_rat, away_rat, margin_dist, K=25, scaler=400):
     
 
 ## define a function to run record prediction for a season
-def run_season_sim(season, game_df, team_rats, K=25, scaler=400):
+def run_season_sim(season, filtered_game_df, team_rats, margin=7, K=25, scaler=400):
     
     # create dictionary to record hot team ratings
     sim_dict = dict()
     
-    # filter game_df by season
-    game_df_hot = game_df.loc[game_df['START_DATE'].str.startswith(str(season))]
-    
-    # calc prob distribution of MOV
-    game_df_cold = game_df.loc[game_df['START_DATE'].str[:4].astype(int) < season]
-    margin_dist = fit_MOV_data(game_df_cold)
-    
     # iterate games
-    for game in game_df_hot.itertuples():
+    for game in filtered_game_df.itertuples():
         
         # parse current date
         date = str(datetime.strptime(game[1][0:10], '%Y-%m-%d').date())
@@ -400,7 +390,7 @@ def run_season_sim(season, game_df, team_rats, K=25, scaler=400):
             sim_dict[game[4]] = []
             
         # sample game results
-        home_info, away_info = sample_game_results(home_rat, away_rat, margin_dist, K=K, scaler=scaler)
+        home_info, away_info = sample_game_results(home_rat, away_rat, margin=margin, K=K, scaler=scaler)
         home_rat_new, home_conf, home_act = home_info
         away_rat_new, away_conf, away_act = away_info
         

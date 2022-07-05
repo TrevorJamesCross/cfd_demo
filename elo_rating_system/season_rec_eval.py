@@ -1,7 +1,7 @@
 """
 College Football Data Demo: Season Record Evaluation
 Author: Trevor Cross
-Last Updated: 07/01/22
+Last Updated: 07/05/22
 
 Simuates NCAAF games using an Elo rating algorithm to predict end season
 records.
@@ -69,8 +69,9 @@ team_rats = json_to_dict(file_path)
 # ---Run Season Simulations---
 # ----------------------------
 
-# define season to simulate
-season = 2015
+# define season and games to simulate
+season = 2016
+filtered_game_df = game_df.loc[game_df['START_DATE'].str.startswith(str(season))]
 
 # define Elo rating algorithm parameters
 K = 25
@@ -80,7 +81,7 @@ scaler = 300
 num_sims = 1000
 
 pool = Pool()
-func_inputs = [(season, game_df, team_rats, K, scaler)]*num_sims
+func_inputs = [(season, filtered_game_df, team_rats, K, scaler)]*num_sims
 
 with Pool() as pool:
     list_of_sims = pool.starmap(run_season_sim, tqdm(func_inputs, desc="Running Sims ", unit=' sims'))
@@ -142,5 +143,8 @@ print("\n >>> Accuracy: {}".format(acc))
 # --------------------------
 
 # evaluate Wisconsin's season record
-wisco_rec = eval_rec(agg_dict, true_rec_dict, 'Wisconsin')
+team_name = 'Wisconsin'
+wisco_rec = eval_rec(agg_dict, true_rec_dict, team_name)
+
+print("\n {}'s Record Prediction:".format(team_name))
 print(wisco_rec)
