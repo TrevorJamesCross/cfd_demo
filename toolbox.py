@@ -1,7 +1,7 @@
 """
 College Football Data Demo: Toolbox
 Author: Trevor Cross
-Last Updated: 07/05/22
+Last Updated: 07/07/22
 
 Series of functions used to extract and analyze data from collegefootballdata.com.
 """
@@ -26,6 +26,7 @@ from scipy.stats import lognorm
 # import visualization libraries
 import matplotlib.pyplot as plt
 from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
+from sklearn.calibration import calibration_curve
 
 # import snowflake connector
 import snowflake.connector
@@ -36,7 +37,7 @@ from snowflake.connector.pandas_tools import write_pandas
 # ---------------------------------
 
 # define CFD function
-## define a function to make requests
+## define function to make requests
 def make_request(url, api_key):
     
     # define headers
@@ -46,7 +47,7 @@ def make_request(url, api_key):
     # return API call as df
     return pd.json_normalize(req.get(url, headers=headers).json())
 
-## define a function to build the URL
+## define function to build the URL
 def build_url(base_url, section, sub_section='', filters=''):
     
     # combine base_url and section_name
@@ -63,7 +64,7 @@ def build_url(base_url, section, sub_section='', filters=''):
     # return final URL
     return final_url
 
-## define a function to build filters
+## define function to build filters
 def build_filter(filter_names, filter_plugins):
     final_filter = "?"
     
@@ -74,7 +75,7 @@ def build_filter(filter_names, filter_plugins):
     # return final filter (remove last '&')
     return final_filter[:-1]
 
-## define a function to get column name-dtype string pairs & arrange them for SF
+## define function to get column name-dtype string pairs & arrange them for SF
 def get_col_info(df):
     
     # define dictionary to change Python dtype to SF dtype
@@ -91,7 +92,7 @@ def get_col_info(df):
     return (','.join([tup[0] + " " + tup[1] for tup in col_info])).replace('.','_')
 
 # define SF functions
-## define a function to connect to SF
+## define function to connect to SF
 def connect_to_SF(json_creds_path):
     
     # read JSON & connect to SF
@@ -122,7 +123,7 @@ def create_table(conn, table_name, col_info):
     # print result
     print("\n >>> Table {} created!".format(table_name.upper()))
     
-## define a function to append data into table in SF
+## define function to append data into table in SF
 def append_data(conn, df, table_name):
     
     # capitalize columns
@@ -154,17 +155,17 @@ def get_init_rat(team_name, fbs_team_list):
 
 ## define function to calculate margin of victory bonus
 def MOV_mult(home_rat, away_rat, margin):
-    return np.log(abs(margin)+1) * ( 2.2 / (abs(home_rat - away_rat)*10**-3 + 2.2) )
+    return np.log(abs(margin)+1) * ( 2.2 / (abs(home_rat - away_rat)*0.001 + 2.2) )
 
 ## define function to calculate Elo confidence
 def calc_conf(rat_a, rat_b, scaler=400):
     return 1 / ( 1 + pow(10, (rat_b-rat_a)/scaler) )
 
 ## define function to calculate new Elo rating
-def calc_new_rats(home_rat, away_rat, margin, K=25, scaler=400):
+def calc_new_rats(home_rat, away_rat, margin, hf_adv=0, K=25, scaler=400):
     
     # calc home & away confidence
-    home_conf = calc_conf(home_rat, away_rat, scaler=scaler)
+    home_conf = calc_conf(home_rat+hf_adv, away_rat, scaler=scaler)
     away_conf = 1 - home_conf
     
     # determine actualized home confidence
@@ -190,8 +191,9 @@ def calc_new_rats(home_rat, away_rat, margin, K=25, scaler=400):
 
 
 ## define function to run elo simulation
-def run_elo_sim(game_df, fbs_team_list, 
-                retain_weight=0.90, K=25, scaler=400):
+def run_elo_sim(game_df, fbs_team_list, rec_pts_dict, poll_dict, 
+                retain_weight=0.90, rec_weight=0.1, rank_weight=25, hf_adv=0,
+                K=25, scaler=400):
 
     # create dictionary to record team Elo ratings
     team_rats = dict()
@@ -214,8 +216,20 @@ def run_elo_sim(game_df, fbs_team_list,
             # get initial rating
             init_rat = get_init_rat(game[2], fbs_team_list)
             
+            # calc recruitment bonus
+            if int(date[:4]) > 2004 and game[2] + '-' + date[:4] in rec_pts_dict:
+                rec_bonus = rec_weight * float(rec_pts_dict[game[2] + '-' + date[:4]])
+            else:
+                rec_bonus = 0
+            
+            # calc rank bonus
+            if game[2] + '-' + date[:4] in poll_dict:
+                rank_bonus = (26 - poll_dict[game[2] + '-' + date[:4]]) * rank_weight
+            else:
+                rank_bonus = 0
+            
             # reset home rating
-            home_rat = int(retain_weight*(team_rats[game[2]][-1][1]-init_rat) + init_rat)
+            home_rat = int(retain_weight*(team_rats[game[2]][-1][1]-init_rat) + init_rat + rec_bonus + rank_bonus)
         
         # if NOT home team exists
         else:
@@ -239,8 +253,20 @@ def run_elo_sim(game_df, fbs_team_list,
             # get initial rating
             init_rat = get_init_rat(game[4], fbs_team_list)
             
+            # calc recruitment bonus
+            if int(date[:4]) > 2004 and game[4] + '-' + date[:4] in rec_pts_dict:
+                rec_bonus = rec_weight * float(rec_pts_dict[game[4] + '-' + date[:4]])
+            else:
+                rec_bonus = 0
+            
+            # calc rank bonus
+            if game[4] + '-' + date[:4] in poll_dict:
+                rank_bonus = (26 - poll_dict[game[4] + '-' + date[:4]]) * rank_weight
+            else:
+                rank_bonus = 0
+            
             # reset away rating
-            away_rat = int(retain_weight*(team_rats[game[4]][-1][1]-init_rat) + init_rat)
+            away_rat = int(retain_weight*(team_rats[game[4]][-1][1]-init_rat) + init_rat + rec_bonus + rank_bonus)
         
         # if NOT away team exists
         else:
@@ -256,7 +282,7 @@ def run_elo_sim(game_df, fbs_team_list,
         margin = game[3] - game[5]
     
         # calc new ratings
-        home_info, away_info = calc_new_rats(home_rat, away_rat, margin, K=K, scaler=scaler)
+        home_info, away_info = calc_new_rats(home_rat, away_rat, margin, hf_adv=hf_adv, K=K, scaler=scaler)
         home_rat_new, home_conf, home_act = home_info
         away_rat_new, away_conf, away_act = away_info
         
@@ -298,25 +324,6 @@ def plot_rats(team_rats, team_name):
 # ---Define Record Prediction Functions---
 # ----------------------------------------
 
-## define a function to fit MOV data
-def fit_MOV_data(game_df):
-    
-    # get MOV data
-    MOV_data = abs(game_df['HOME_POINTS'] - game_df['AWAY_POINTS'])
-    
-    # get lognormal parameters
-    s, loc, scale = lognorm.fit(MOV_data)
-    
-    # generate lognormal distribution of scores
-    x = np.arange(0, max(MOV_data), 1)
-    
-    ## for some (dumb) reason, lognorm.pdf does not produce normalized vaues
-    y = lognorm.pdf(x, s, loc, scale)
-    y /= np.sum(y)
-    
-    # return x and y values
-    return (x,y)
-
 ## define function to sample game results
 def sample_game_results(home_rat, away_rat, margin=7, K=25, scaler=400):
     
@@ -347,48 +354,62 @@ def sample_game_results(home_rat, away_rat, margin=7, K=25, scaler=400):
     return (round(home_rat_new), home_conf, home_act), (round(away_rat_new), away_conf, away_act)
     
 
-## define a function to run record prediction for a season
-def run_season_sim(season, filtered_game_df, team_rats, margin=7, K=25, scaler=400):
+## define function to run record prediction for a season
+def run_season_sim(season, game_df, team_rats, margin=7, K=25, scaler=400):
     
     # create dictionary to record hot team ratings
     sim_dict = dict()
     
     # iterate games
-    for game in filtered_game_df.itertuples():
-        
+    for game in game_df.itertuples():
+
         # parse current date
         date = str(datetime.strptime(game[1][0:10], '%Y-%m-%d').date())
         
-        # if home team exists
+        # if home team already in sim dict
         if game[2] in sim_dict:
             
             # get current home rating
             home_rat = sim_dict[game[2]][-1][1]
         
-        # if NOT home team exists
-        else:
+        # if home team in ratings dict
+        elif game[2] in team_rats:
             
             # get starting rating for the season
-            home_rat = next(team_rats[game[2]][items_num-1][1] for items_num, items in enumerate(team_rats[game[2]]) if items[0][:4]==str(season))
-            
-            # append home team to dict
+            try:
+                home_rat = next(team_rats[game[2]][items_num-1][1] for items_num, items in enumerate(team_rats[game[2]]) if items[0][:4]==str(season))
+            except StopIteration:
+                home_rat = team_rats[game[2]][-1][1]
+                
+            # append home team to sim dict
             sim_dict[game[2]] = []
-            
-        # if home team exists
+        
+        # skip game
+        else:
+            continue
+        
+        # if away team already in sim dict
         if game[4] in sim_dict:
             
             # get current home rating
             away_rat = sim_dict[game[4]][-1][1]
         
-        # if NOT away team exists
-        else:
+        # if away team in ratings dict
+        elif game[4] in team_rats:
             
             # get starting rating for the season
-            away_rat = next(team_rats[game[4]][items_num-1][1] for items_num, items in enumerate(team_rats[game[4]]) if items[0][:4]==str(season))
-            
-            # append away team to dict
+            try:
+                away_rat = next(team_rats[game[4]][items_num-1][1] for items_num, items in enumerate(team_rats[game[4]]) if items[0][:4]==str(season))
+            except StopIteration:
+                away_rat = team_rats[game[4]][-1][1] 
+                
+            # append away team to sim dict
             sim_dict[game[4]] = []
-            
+        
+        # skip game
+        else:
+            continue
+        
         # sample game results
         home_info, away_info = sample_game_results(home_rat, away_rat, margin=margin, K=K, scaler=scaler)
         home_rat_new, home_conf, home_act = home_info
@@ -401,31 +422,31 @@ def run_season_sim(season, filtered_game_df, team_rats, margin=7, K=25, scaler=4
     # return dictionary of team Elo ratings
     return sim_dict
 
-## define a function to evaluate predicted season record for a given team
+## define function to evaluate predicted season record for a given team
 def eval_rec(agg_dict, true_rec_dict, team_name):
     game_preds = np.array(list(map(round, map(itemgetter(2), agg_dict[team_name]))))
     true_acts = np.array(list(map(itemgetter(1), true_rec_dict[team_name])))
     
-    return game_preds == true_acts
+    return game_preds == true_acts, sum(game_preds == true_acts) / len(game_preds)
 
 # ----------------------------
 # ---Define Other Functions---
 # ----------------------------
 
-## define a function to round numbers up
+## define function to round numbers up
 def round_up(x):
     return int(x) + (x % 1 > 0)
 
-## define a function to calculate log base n
+## define function to calculate log base n
 def log_n(x, n=10):
     return np.log(x) / np.log(n)
 
-## define a function to plot confusion matrix
+## define function to plot confusion matrix
 def disp_conf_mat(preds, acts):
     conf_mat = confusion_matrix(acts, preds)
     ConfusionMatrixDisplay(conf_mat).plot()
     
-## define a function to take the cartesian product of an arbitrary number of lists
+## define function to take the cartesian product of an arbitrary number of lists
 def cart_prod(list_of_lists):
     
     # check argument is list of lists
@@ -471,3 +492,14 @@ def dict_to_json(my_dict, file_path):
 def json_to_dict(file_path):
     with open(file_path) as file:
         return json.load(file)
+    
+## define function to plot calibration curve
+def plot_cal_curve(acts, preds, n_bins=5):
+    probs_act, probs_pred = calibration_curve(acts, preds, n_bins=n_bins)
+    
+    plt.plot([0,1],[0,1],':k')
+    plt.plot(probs_pred, probs_act, '-s')
+    
+    plt.title('Calibration Curve')
+    plt.xlabel("Mean Predicted Value")
+    plt.ylabel("Fraction of Positives")

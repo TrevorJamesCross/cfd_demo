@@ -1,6 +1,6 @@
 sudo docker run -it --rm \
---mount type=bind,source=${PWD}/sf_tmp,target=/dwcc-output \
---mount type=bind,source=${PWD}/sf_tmp,target=/app/log \
+--mount type=bind,source=${PWD}/tmp_dir,target=/dwcc-output \
+--mount type=bind,source=${PWD}/tmp_dir,target=/app/log \
 datadotworld/dwcc:latest catalog-snowflake \
 --account=aebs-dev \
 --server=<server> \

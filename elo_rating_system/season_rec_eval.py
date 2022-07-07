@@ -1,7 +1,7 @@
 """
 College Football Data Demo: Season Record Evaluation
 Author: Trevor Cross
-Last Updated: 07/05/22
+Last Updated: 07/07/22
 
 Simuates NCAAF games using an Elo rating algorithm to predict end season
 records.
@@ -34,6 +34,9 @@ from toolbox import *
 # ---Pull Data---
 # ---------------
 
+# define season and games to simulate
+season = 2022
+
 # define path to SF credentials
 json_creds_path = join(expanduser('~'),'secrets/SF_creds.json')
 
@@ -43,9 +46,9 @@ conn = connect_to_SF(json_creds_path)
 # obtain game data
 game_query = """
              select start_date, home_team, home_points, away_team, away_points from games
-             where season >= 1970 and season < 2021
+             where season = {} and (home_team in (select home_team from games where season = {}))
              order by start_date
-             """
+             """.format(season, season-1)
                 
 game_df = pd.read_sql(game_query, conn)
 
@@ -69,38 +72,33 @@ team_rats = json_to_dict(file_path)
 # ---Run Season Simulations---
 # ----------------------------
 
-# define season and games to simulate
-season = 2016
-filtered_game_df = game_df.loc[game_df['START_DATE'].str.startswith(str(season))]
-
 # define Elo rating algorithm parameters
 K = 25
 scaler = 300
+margin = 7
 
 # run season simulations
-num_sims = 1000
-
-pool = Pool()
-func_inputs = [(season, filtered_game_df, team_rats, K, scaler)]*num_sims
+num_sims = 500
+func_inputs = [(season, game_df, team_rats, margin, K, scaler)]*num_sims
 
 with Pool() as pool:
     list_of_sims = pool.starmap(run_season_sim, tqdm(func_inputs, desc="Running Sims ", unit=' sims'))
 
 # "invert" list_of_sims (list of dicts -> dict of lists)
-team_rats_hot = dict()
+team_sims_dict = dict()
 for key_num, key in enumerate(list_of_sims[0]):
-    team_rats_hot[key] = []
+    team_sims_dict[key] = []
     
     for sim_num, sim in enumerate(list_of_sims):
-        team_rats_hot[key].append(sim[key])
+        team_sims_dict[key].append(sim[key])
 
 # create aggregate dictionary
 agg_dict = dict()
-for key_num, key in enumerate(team_rats_hot):
+for key_num, key in enumerate(team_sims_dict):
     agg_dict[key] = []
     
-    for items_num in range(len(team_rats_hot[key][0])):
-        like_games = list(map(itemgetter(items_num), team_rats_hot[key]))
+    for items_num in range(len(team_sims_dict[key][0])):
+        like_games = list(map(itemgetter(items_num), team_sims_dict[key]))
         date = like_games[0][0]
         mean_rats = np.mean(list(map(itemgetter(1), like_games)))
         mean_conf = np.mean(list(map(itemgetter(2), like_games)))
@@ -112,39 +110,36 @@ for key_num, key in enumerate(team_rats_hot):
 # ---Evaluate Simulations---
 # --------------------------
 
-# get true game outcomes
-true_rec_dict = dict()
-for key_num, key in enumerate(team_rats):
-    true_rec_dict[key] = [(items[0], items[3]) for items in team_rats[key] if items[0][:4] == str(season)]
-
-# get predicted & true actualized values
-pred_acts = []
-true_acts = []
-for key_num, key in enumerate(agg_dict):
-    pred_acts.extend(list(map(itemgetter(3), agg_dict[key])))
-    true_acts.extend(list(map(itemgetter(1), true_rec_dict[key])))
-
-# remove Nonetype from true_acts
-## some teams had duplicate/first game in specified season
-true_acts = [act for act in true_acts if act != None]
-
-# print season & number of simulations aggregated
-print("\n >>> {}, Number of Sims: {}".format(season, num_sims))
-
-# calc log loss & accuracy
-loss = log_loss(true_acts, pred_acts)
-print("\n >>> Log Loss: {}".format(loss))
-        
-acc = accuracy_score(true_acts, list(map(round, pred_acts)))
-print("\n >>> Accuracy: {}".format(acc))
-
-# --------------------------
-# ---Evaluate Team Record---
-# --------------------------
-
-# evaluate Wisconsin's season record
-team_name = 'Wisconsin'
-wisco_rec = eval_rec(agg_dict, true_rec_dict, team_name)
-
-print("\n {}'s Record Prediction:".format(team_name))
-print(wisco_rec)
+if season < 2022:
+    
+    # get true game outcomes
+    true_rec_dict = dict()
+    for key_num, key in enumerate(team_rats):
+        true_rec_dict[key] = [(items[0], items[3]) for items in team_rats[key] if items[0][:4] == str(season)]
+    
+    # get predicted & true actualized values
+    pred_acts = []
+    true_acts = []
+    for key_num, key in enumerate(agg_dict):
+        pred_acts.extend(list(map(itemgetter(3), agg_dict[key])))
+        true_acts.extend(list(map(itemgetter(1), true_rec_dict[key])))
+    
+    # remove Nonetype from true_acts
+    ## some teams had duplicate/first game in specified season
+    true_acts = [act for act in true_acts if act != None]
+    
+    # print season & number of simulations aggregated
+    print("\n >>> {}, Number of Sims: {}".format(season, num_sims))
+    
+    # calc log loss & accuracy
+    loss = log_loss(true_acts, pred_acts)
+    print("\n >>> Log Loss: {}".format(loss))
+            
+    acc = accuracy_score(true_acts, list(map(round, pred_acts)))
+    print("\n >>> Accuracy: {}".format(acc))
+    
+    # evaluate Wisconsin's season record
+    team_name = 'Illinois'
+    wisco_rec, perc_corr = eval_rec(agg_dict, true_rec_dict, team_name)
+    
+    print("\n {}'s Record Prediction: {} {}".format(team_name, wisco_rec, perc_corr))

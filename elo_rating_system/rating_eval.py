@@ -1,7 +1,7 @@
 """
 College Football Data Demo: Elo Rating Evaluation
 Author: Trevor Cross
-Last Updated: 07/01/22
+Last Updated: 07/07/22
 
 Simuates NCAAF games using an Elo rating algorithm and compares the results 
 against a naive method. Incorporates parameter tuning.
@@ -40,7 +40,7 @@ conn = connect_to_SF(json_creds_path)
 # obtain game data
 game_query = """
              select start_date, home_team, home_points, away_team, away_points from games
-             where season >= 1970 and season < 2021
+             where season >= 1960 and season < 2022
              order by start_date
              """
                 
@@ -53,6 +53,29 @@ fbs_query = """
 
 fbs_team_list = pd.read_sql(fbs_query, conn)['SCHOOL'].tolist()
 
+# obtain recruitment data
+rec_query = """ 
+            select year, team, points from recruiting_teams
+            """
+
+rec_pts_df = pd.read_sql(rec_query, conn)
+rec_pts_dict = dict(zip( (rec_pts_df['TEAM'] + '-' + rec_pts_df['YEAR'].apply(str)), rec_pts_df['POINTS']))
+
+# obtain preseason polling info
+poll_query = """
+             select season, polls from rankings
+             where week = 1
+             order by season;
+             """
+
+poll_df = pd.read_sql(poll_query, conn)
+
+poll_dict = dict()
+for row in poll_df.itertuples():
+    info_list = json.loads(row[2])[-1]['ranks']
+    for info in info_list:
+        poll_dict[info['school'] + '-' + str(row[1])] = info['rank']
+    
 # close connection
 conn.close()
 
@@ -99,21 +122,24 @@ for game in tqdm(game_df.itertuples(), desc='Running Naive Sim ', unit='game', t
 # ------------------------
 
 # define parameter iterations
-retain_weights = [0.85]
-Ks = [25]
-scalers = [300]
+retain_weights = [0.65, 0.7, 0.75]
+rec_weights = [0.25, 0.3, 0.35]
+rank_weights = [3, 5, 7]
+hf_advs = [45, 50, 55]
+Ks = [25, 30, 35]
+scalers = [300, 350, 400]
 
 # get parameter permutations
-perms = cart_prod([retain_weights, Ks, scalers])
+perms = cart_prod([retain_weights, rec_weights, rank_weights, hf_advs, Ks, scalers])
 
 # store perm results
 results = []
     
 # run elo simulation for each permutation of paramters
 for perm in perms:
-    
-    team_rats = run_elo_sim(game_df, fbs_team_list,
-                            retain_weight=perm[0], K=perm[1], scaler=perm[2])
+    team_rats = run_elo_sim(game_df, fbs_team_list, rec_pts_dict, poll_dict, 
+                            retain_weight=perm[0], rec_weight=perm[1], rank_weight = perm[2], hf_adv=perm[3],
+                            K=perm[4], scaler=perm[5])
         
     # ---------------------
     # ---Evaluate Models---

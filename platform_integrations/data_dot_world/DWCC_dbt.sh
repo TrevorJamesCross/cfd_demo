@@ -1,6 +1,6 @@
 sudo docker run -it --rm \
---mount type=bind,source=${PWD}/dbt_tmp,target=/dwcc-input \
---mount type=bind,source=${PWD}/dbt_tmp,target=/dwcc-output \
+--mount type=bind,source=${PWD}/tmp_dir,target=/dwcc-input \
+--mount type=bind,source=${PWD}/tmp_dir,target=/dwcc-output \
 datadotworld/dwcc:latest catalog-dbt \
 --account=aebs-dev \
 --dbt-profile-file=/dwcc-input/profiles.yml \

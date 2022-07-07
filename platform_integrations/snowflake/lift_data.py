@@ -1,7 +1,7 @@
 """
 College Football Data Analytics: Lift Data
 Author: Trevor Cross
-Last Updated: 06/24/22
+Last Updated: 07/07/22
 
 Extracts available data from collegefootballdata.com and loads it into
 snowflake.
@@ -46,7 +46,7 @@ conn = connect_to_SF(json_creds_path)
 
 # define filters
 empty = ['']
-years = list(np.arange(2013,2022,1))
+years = list(np.arange(1936,2000,1))
 weeks = list(np.arange(1,21,1))
 
 teams_fbs_resp = list(conn.cursor().execute("SELECT school FROM teams_fbs"))
@@ -56,13 +56,13 @@ teams_fbs = [''.join(school).replace(' ','%20') for school in teams_fbs_resp]
 base_url = "https://api.collegefootballdata.com"
 
 # define list of sections
-sections = ['lines']
+sections = ['rankings']
 
 # define dictionary of subsections
-subsection_dict = {'lines':['']}
+subsection_dict = {'rankings':['']}
 
 # define filters for subsections
-filter_dict = {'':['year','week']}
+filter_dict = {'':['year']}
 
 # define filter plugins values dictionary
 plugin_dict = {'':empty,
