@@ -1,7 +1,7 @@
 """
 College Football Data Demo: Toolbox
 Author: Trevor Cross
-Last Updated: 07/07/22
+Last Updated: 07/08/22
 
 Series of functions used to extract and analyze data from collegefootballdata.com.
 """
@@ -21,7 +21,6 @@ from os.path import join
 from tqdm import tqdm
 from operator import itemgetter
 from datetime import datetime
-from scipy.stats import lognorm
 
 # import visualization libraries
 import matplotlib.pyplot as plt
@@ -151,7 +150,7 @@ def get_init_rat(team_name, fbs_team_list):
     
     # if not fbs team, return lower init rating
     else:
-        return 1200
+        return 1150
 
 ## define function to calculate margin of victory bonus
 def MOV_mult(home_rat, away_rat, margin):
@@ -191,9 +190,9 @@ def calc_new_rats(home_rat, away_rat, margin, hf_adv=0, K=25, scaler=400):
 
 
 ## define function to run elo simulation
-def run_elo_sim(game_df, fbs_team_list, rec_pts_dict, poll_dict, 
-                retain_weight=0.90, rec_weight=0.1, rank_weight=25, hf_adv=0,
-                K=25, scaler=400):
+def run_elo_sim(game_df, fbs_team_list, rec_pts_dict, poll_dict,
+                high_rat=1500, low_rat=1200, retain_weight=0.90, rec_weight=0.1,
+                rank_weight=25, hf_adv=0, K=25, scaler=400):
 
     # create dictionary to record team Elo ratings
     team_rats = dict()
@@ -224,12 +223,12 @@ def run_elo_sim(game_df, fbs_team_list, rec_pts_dict, poll_dict,
             
             # calc rank bonus
             if game[2] + '-' + date[:4] in poll_dict:
-                rank_bonus = (26 - poll_dict[game[2] + '-' + date[:4]]) * rank_weight
+                rank_bonus = (26 - np.mean(poll_dict[game[2] + '-' + date[:4]])) * rank_weight
             else:
                 rank_bonus = 0
             
             # reset home rating
-            home_rat = int(retain_weight*(team_rats[game[2]][-1][1]-init_rat) + init_rat + rec_bonus + rank_bonus)
+            home_rat = int(retain_weight*(team_rats[game[2]][-1][1] - init_rat + rec_bonus) + init_rat + rank_bonus)
         
         # if NOT home team exists
         else:
@@ -261,12 +260,12 @@ def run_elo_sim(game_df, fbs_team_list, rec_pts_dict, poll_dict,
             
             # calc rank bonus
             if game[4] + '-' + date[:4] in poll_dict:
-                rank_bonus = (26 - poll_dict[game[4] + '-' + date[:4]]) * rank_weight
+                rank_bonus = (26 - np.mean(poll_dict[game[4] + '-' + date[:4]])) * rank_weight
             else:
                 rank_bonus = 0
             
             # reset away rating
-            away_rat = int(retain_weight*(team_rats[game[4]][-1][1]-init_rat) + init_rat + rec_bonus + rank_bonus)
+            away_rat = int(retain_weight*(team_rats[game[4]][-1][1]- init_rat + rec_bonus) + init_rat + rank_bonus)
         
         # if NOT away team exists
         else:
