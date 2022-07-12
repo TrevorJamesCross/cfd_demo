@@ -1,7 +1,7 @@
 """
 College Football Data Analytics: Lift Data
 Author: Trevor Cross
-Last Updated: 07/07/22
+Last Updated: 07/12/22
 
 Extracts available data from collegefootballdata.com and loads it into
 snowflake.
@@ -46,8 +46,9 @@ conn = connect_to_SF(json_creds_path)
 
 # define filters
 empty = ['']
-years = list(np.arange(1936,2000,1))
-weeks = list(np.arange(1,21,1))
+years = list(np.arange(2001,2022))
+weeks = list(np.arange(1,10))
+seasonTypes = ['postseason']
 
 teams_fbs_resp = list(conn.cursor().execute("SELECT school FROM teams_fbs"))
 teams_fbs = [''.join(school).replace(' ','%20') for school in teams_fbs_resp]
@@ -56,20 +57,21 @@ teams_fbs = [''.join(school).replace(' ','%20') for school in teams_fbs_resp]
 base_url = "https://api.collegefootballdata.com"
 
 # define list of sections
-sections = ['rankings']
+sections = ['plays']
 
 # define dictionary of subsections
-subsection_dict = {'rankings':['']}
+subsection_dict = {'plays':['']}
 
 # define filters for subsections
-filter_dict = {'':['year']}
+filter_dict = {'':['year', 'week', 'seasonType']}
 
 # define filter plugins values dictionary
 plugin_dict = {'':empty,
                'year':years,
                'week':weeks,
                'team1':teams_fbs,
-               'team2':teams_fbs}
+               'team2':teams_fbs,
+               'seasonType':seasonTypes}
 
 # iterate through sections
 for sec in sections:
@@ -106,12 +108,12 @@ for sec in sections:
                 # append data to SF table if not empty
                 if len(df) > 0 and not df.equals(bad_df):
                     
-                    # create table in SF
-                    if subsec != '':
-                        table_name = '_'.join([sec,subsec])
-                    else:
-                        table_name = sec
-                    
+                    # # create table in SF
+                    # if subsec != '':
+                    #     table_name = '_'.join([sec,subsec])
+                    # else:
+                    #     table_name = sec
+                    table_name = 'PLAY_BY_PLAY'
                     try:
                         create_table(conn, table_name, get_col_info(df))
                     except:

@@ -1,7 +1,7 @@
 """
 College Football Data Demo: Toolbox
 Author: Trevor Cross
-Last Updated: 07/08/22
+Last Updated: 07/12/22
 
 Series of functions used to extract and analyze data from collegefootballdata.com.
 """
@@ -44,7 +44,7 @@ def make_request(url, api_key):
                "Authorization": "Bearer {}".format(api_key)}
 
     # return API call as df
-    return pd.json_normalize(req.get(url, headers=headers).json())
+    return pd.DataFrame(req.get(url, headers=headers).json())
 
 ## define function to build the URL
 def build_url(base_url, section, sub_section='', filters=''):
@@ -99,11 +99,11 @@ def connect_to_SF(json_creds_path):
         creds = json.load(file)
         
     conn = snowflake.connector.connect(user=creds['user'],
-                                           password=creds['password'],
-                                           account=creds['account'],
-                                           warehouse=creds['warehouse'],
-                                           database=creds['database'],
-                                           schema=creds['schema'])
+                                       password=creds['password'],
+                                       account=creds['account'],
+                                       warehouse=creds['warehouse'],
+                                       database=creds['database'],
+                                       schema=creds['schema'])
     
     # return connector
     return conn
@@ -150,7 +150,7 @@ def get_init_rat(team_name, fbs_team_list):
     
     # if not fbs team, return lower init rating
     else:
-        return 1150
+        return 1200
 
 ## define function to calculate margin of victory bonus
 def MOV_mult(home_rat, away_rat, margin):
@@ -162,7 +162,7 @@ def calc_conf(rat_a, rat_b, scaler=400):
 
 ## define function to calculate new Elo rating
 def calc_new_rats(home_rat, away_rat, margin, hf_adv=0, K=25, scaler=400):
-    
+
     # calc home & away confidence
     home_conf = calc_conf(home_rat+hf_adv, away_rat, scaler=scaler)
     away_conf = 1 - home_conf
@@ -188,21 +188,47 @@ def calc_new_rats(home_rat, away_rat, margin, hf_adv=0, K=25, scaler=400):
     # return new ratings, confidence, and actualized value
     return (round(home_rat_new), home_conf, home_act), (round(away_rat_new), away_conf, away_act)
 
-
-## define function to run elo simulation
-def run_elo_sim(game_df, fbs_team_list, rec_pts_dict, poll_dict,
-                high_rat=1500, low_rat=1200, retain_weight=0.90, rec_weight=0.1,
-                rank_weight=25, hf_adv=0, K=25, scaler=400):
-
-    # create dictionary to record team Elo ratings
-    team_rats = dict()
+## define function to record matchup history in dictionary
+def build_matchup_dict(game_df, current_season):
+    
+    # define matchup dictionary
+    matchup_dict = dict()
     
     # iterate through games
-    for game in tqdm(game_df.itertuples(), desc='Running Elo Sim ', unit=' games', total=game_df.shape[0]):
+    for game in game_df.itertuples():
         
-        # parse current date
-        date = str(datetime.strptime(game[1][0:10], '%Y-%m-%d').date())
+        # check if matchup is in dict
+        if game[2] + '-' + game[4] + '-' + str(current_season)  in matchup_dict or game[4] + '-' + game[2] + '-' + str(current_season) in matchup_dict:
+            try:
+                matchup_dict[game[2] + '-' + game[4] + '-' + str(current_season)].append( game[3]>game[5] )
+            except KeyError:
+                matchup_dict[game[4] + '-' + game[2] + '-' + str(current_season)].append( game[5]>game[3] )
+                
+        # append matchup to dict
+        else:
+            matchup_dict[game[2] + '-' + game[4] + '-' + str(current_season)] = []
+            matchup_dict[game[2] + '-' + game[4] + '-' + str(current_season)].append( game[3]>game[5] )
     
+    # aggregate results
+    for key in matchup_dict:
+        matchup_dict[key] = (matchup_dict[key].count(True), matchup_dict[key].count(False))
+    
+    # return matchup_dict
+    return matchup_dict
+    
+## define function to run elo simulation
+def run_elo_sim(game_df, fbs_team_list, rec_pts_dict, poll_dict,
+                retain_weight=0.90, rec_weight=0.1, rank_weight=5, hf_adv=0, K=25, scaler=400):
+    
+    # create dictionary to record team Elo ratings
+    team_rats = dict()
+        
+    # iterate through games
+    for game in tqdm(game_df.itertuples(), desc='Running Elo Sim ', unit=' games', total=game_df.shape[0]):
+
+        # parse current date
+        date = str(datetime.strptime(game[1][:10], '%Y-%m-%d').date())
+        
         # if home team exists and in same season
         if game[2] in team_rats and int(team_rats[game[2]][-1][0][:4]) == int(date[:4]):
             
@@ -279,7 +305,7 @@ def run_elo_sim(game_df, fbs_team_list, rec_pts_dict, poll_dict,
         
         # calc score margin from game
         margin = game[3] - game[5]
-    
+            
         # calc new ratings
         home_info, away_info = calc_new_rats(home_rat, away_rat, margin, hf_adv=hf_adv, K=K, scaler=scaler)
         home_rat_new, home_conf, home_act = home_info
@@ -293,11 +319,21 @@ def run_elo_sim(game_df, fbs_team_list, rec_pts_dict, poll_dict,
     return team_rats
     
 ## define function to plot ratings
-def plot_rats(team_rats, team_name):
-    
+def plot_rats(team_rats, team_name, previous_seasons=5):
+        
+        # create figure
+        plt.figure()
+        
         # extract dates and ratings
         dates_list = list(map(itemgetter(0), team_rats[team_name]))
         rats_list = list(map(itemgetter(1), team_rats[team_name]))
+        
+        # filter dates and ratings
+        while int(dates_list[0][:4]) < int(dates_list[-1][:4]) - previous_seasons:
+            for date_index, date in enumerate(dates_list):
+                if int(date[:4]) < int(dates_list[-1][:4]) - previous_seasons:
+                    del dates_list[date_index]
+                    del rats_list[date_index]
         
         # define graph styling
         plt.style.use('bmh')
@@ -324,10 +360,10 @@ def plot_rats(team_rats, team_name):
 # ----------------------------------------
 
 ## define function to sample game results
-def sample_game_results(home_rat, away_rat, margin=7, K=25, scaler=400):
+def sample_game_results(home_rat, away_rat, margin=7, hf_adv=0, K=25, scaler=400):
     
     # calc confidence
-    home_conf = calc_conf(home_rat, away_rat, scaler)
+    home_conf = calc_conf(home_rat+hf_adv, away_rat, scaler)
     away_conf = 1 - home_conf
     
     # generate random number
@@ -354,8 +390,9 @@ def sample_game_results(home_rat, away_rat, margin=7, K=25, scaler=400):
     
 
 ## define function to run record prediction for a season
-def run_season_sim(season, game_df, team_rats, margin=7, K=25, scaler=400):
-    
+def run_season_sim(season, game_df, team_rats, fbs_team_list, rec_pts_dict, poll_dict, 
+                   retain_weight=0.90, margin=7, rec_weight=0.1, rank_weight=5, hf_adv=0, K=25, scaler=400):
+
     # create dictionary to record hot team ratings
     sim_dict = dict()
     
@@ -374,12 +411,28 @@ def run_season_sim(season, game_df, team_rats, margin=7, K=25, scaler=400):
         # if home team in ratings dict
         elif game[2] in team_rats:
             
+            # get initial rating
+            init_rat = get_init_rat(game[2], fbs_team_list)
+            
+            # calc recruitment bonus
+            if int(date[:4]) > 2004 and game[2] + '-' + date[:4] in rec_pts_dict:
+                rec_bonus = rec_weight * float(rec_pts_dict[game[2] + '-' + date[:4]])
+            else:
+                rec_bonus = 0
+            
+            # calc rank bonus
+            if game[2] + '-' + date[:4] in poll_dict:
+                rank_bonus = (26 - np.mean(poll_dict[game[2] + '-' + date[:4]])) * rank_weight
+            else:
+                rank_bonus = 0
+            
             # get starting rating for the season
             try:
                 home_rat = next(team_rats[game[2]][items_num-1][1] for items_num, items in enumerate(team_rats[game[2]]) if items[0][:4]==str(season))
             except StopIteration:
-                home_rat = team_rats[game[2]][-1][1]
+                home_rat = retain_weight*(team_rats[game[2]][-1][1] - init_rat + rec_bonus) + init_rat + rank_bonus
                 
+
             # append home team to sim dict
             sim_dict[game[2]] = []
         
@@ -396,21 +449,41 @@ def run_season_sim(season, game_df, team_rats, margin=7, K=25, scaler=400):
         # if away team in ratings dict
         elif game[4] in team_rats:
             
+            # get initial rating
+            init_rat = get_init_rat(game[4], fbs_team_list)
+            
+            # calc recruitment bonus
+            if int(date[:4]) > 2004 and game[4] + '-' + date[:4] in rec_pts_dict:
+                rec_bonus = rec_weight * float(rec_pts_dict[game[4] + '-' + date[:4]])
+            else:
+                rec_bonus = 0
+            
+            # calc rank bonus
+            if game[4] + '-' + date[:4] in poll_dict:
+                rank_bonus = (26 - np.mean(poll_dict[game[4] + '-' + date[:4]])) * rank_weight
+            else:
+                rank_bonus = 0
+            
             # get starting rating for the season
             try:
                 away_rat = next(team_rats[game[4]][items_num-1][1] for items_num, items in enumerate(team_rats[game[4]]) if items[0][:4]==str(season))
             except StopIteration:
-                away_rat = team_rats[game[4]][-1][1] 
+                away_rat = retain_weight*(team_rats[game[4]][-1][1] - init_rat + rec_bonus) + init_rat + rank_bonus
                 
             # append away team to sim dict
             sim_dict[game[4]] = []
         
         # skip game
         else:
+            
+            # remove empty list of home team
+            if len(sim_dict[game[2]]) == 0:
+                sim_dict.pop(game[2])
+                
             continue
         
         # sample game results
-        home_info, away_info = sample_game_results(home_rat, away_rat, margin=margin, K=K, scaler=scaler)
+        home_info, away_info = sample_game_results(home_rat, away_rat, margin=margin, hf_adv=hf_adv, K=K, scaler=scaler)
         home_rat_new, home_conf, home_act = home_info
         away_rat_new, away_conf, away_act = away_info
         

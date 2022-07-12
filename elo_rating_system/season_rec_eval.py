@@ -1,7 +1,7 @@
 """
 College Football Data Demo: Season Record Evaluation
 Author: Trevor Cross
-Last Updated: 07/07/22
+Last Updated: 07/12/22
 
 Simuates NCAAF games using an Elo rating algorithm to predict end season
 records.
@@ -22,6 +22,7 @@ from multiprocessing import Pool
 from os.path import expanduser, join
 import sys
 from operator import itemgetter
+import json
 from tqdm import tqdm
 from sklearn.metrics import log_loss, accuracy_score
 
@@ -46,9 +47,9 @@ conn = connect_to_SF(json_creds_path)
 # obtain game data
 game_query = """
              select start_date, home_team, home_points, away_team, away_points from games
-             where season = {} and (home_team in (select home_team from games where season = {}))
+             where season = {}
              order by start_date
-             """.format(season, season-1)
+             """.format(season)
                 
 game_df = pd.read_sql(game_query, conn)
 
@@ -59,6 +60,36 @@ fbs_query = """
 
 fbs_team_list = pd.read_sql(fbs_query, conn)['SCHOOL'].tolist()
 
+# obtain recruitment data
+rec_query = """ 
+            select year, team, points from recruiting_teams
+            where year = {}
+            """.format(season)
+
+rec_pts_df = pd.read_sql(rec_query, conn)
+rec_pts_dict = dict(zip( (rec_pts_df['TEAM'] + '-' + rec_pts_df['YEAR'].apply(str)), rec_pts_df['POINTS']))
+
+# obtain preseason polling info
+poll_query = """
+             select season, polls from rankings
+             where week = 1 and season = {}
+             order by season;
+             """.format(season)
+
+poll_df = pd.read_sql(poll_query, conn)
+
+poll_dict = dict()
+for row in poll_df.itertuples():
+    poll_list = json.loads(row[2])
+    for poll in poll_list:
+        info_list = poll['ranks']
+        for info in info_list:
+            if info['school'] + '-' + str(row[1]) in poll_dict:
+                poll_dict[info['school'] + '-' + str(row[1])].append(info['rank'])
+            else:
+                poll_dict[info['school'] + '-' + str(row[1])] = []
+                poll_dict[info['school'] + '-' + str(row[1])].append(info['rank'])
+                
 # close SF connection
 conn.close()
 
@@ -73,13 +104,18 @@ team_rats = json_to_dict(file_path)
 # ----------------------------
 
 # define Elo rating algorithm parameters
-K = 25
-scaler = 300
+retain_weight = 0.7
 margin = 7
+rec_weight = 0.375
+rank_weight = 3.5
+hf_adv = 55
+K = 32.5
+scaler = 350
 
 # run season simulations
-num_sims = 500
-func_inputs = [(season, game_df, team_rats, margin, K, scaler)]*num_sims
+num_sims = 2000
+func_inputs = [(season, game_df, team_rats, fbs_team_list, rec_pts_dict, poll_dict,
+                retain_weight, margin, rec_weight, rank_weight, hf_adv, K, scaler)]*num_sims
 
 with Pool() as pool:
     list_of_sims = pool.starmap(run_season_sim, tqdm(func_inputs, desc="Running Sims ", unit=' sims'))
@@ -138,8 +174,8 @@ if season < 2022:
     acc = accuracy_score(true_acts, list(map(round, pred_acts)))
     print("\n >>> Accuracy: {}".format(acc))
     
-    # evaluate Wisconsin's season record
+    # evaluate a team's season record
     team_name = 'Illinois'
-    wisco_rec, perc_corr = eval_rec(agg_dict, true_rec_dict, team_name)
+    team_rec, perc_corr = eval_rec(agg_dict, true_rec_dict, team_name)
     
-    print("\n {}'s Record Prediction: {} {}".format(team_name, wisco_rec, perc_corr))
+    print("\n {}'s Record Prediction: {} {}".format(team_name, team_rec, perc_corr))

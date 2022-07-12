@@ -1,7 +1,7 @@
 """
 College Football Data Demo: Scrape Recruitment Scores
 Author: Trevor Cross
-Last Updated: 07/10/22
+Last Updated: 07/11/22
 
 Scrapes latest recruitment scores from 247 sports.
 """
@@ -93,7 +93,7 @@ points_list = list(map(float, points_list))
 # create pandas DataFrame
 rec_dict = {"YEAR":[2022]*(len(team_list)),
             "RANK":np.arange(1,len(team_list)+1),
-            "TEAMS":team_list,
+            "TEAM":team_list,
             "POINTS":points_list}
 
 rec_df = pd.DataFrame(data=rec_dict)

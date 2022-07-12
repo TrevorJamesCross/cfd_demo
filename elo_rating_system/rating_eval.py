@@ -1,7 +1,7 @@
 """
 College Football Data Demo: Elo Rating Evaluation
 Author: Trevor Cross
-Last Updated: 07/08/22
+Last Updated: 07/12/22
 
 Simuates NCAAF games using an Elo rating algorithm and compares the results 
 against a naive method. Incorporates parameter tuning.
@@ -18,6 +18,7 @@ import pandas as pd
 # import support functions
 from os.path import expanduser, join
 import sys
+import json
 from tqdm import tqdm
 from operator import itemgetter
 from sklearn.metrics import log_loss, accuracy_score
@@ -41,11 +42,12 @@ conn = connect_to_SF(json_creds_path)
 game_query = """
              select start_date, home_team, home_points, away_team, away_points from games
              where season >= 1960 and season < 2022
+             and home_points is not null and away_points is not null
              order by start_date
              """
                 
 game_df = pd.read_sql(game_query, conn)
-
+    
 # obtain fbs team list
 fbs_query = """
             select school from teams_fbs
@@ -143,9 +145,9 @@ results = []
     
 # run elo simulation for each permutation of paramters
 for perm in perms:
-    team_rats = run_elo_sim(game_df, fbs_team_list, rec_pts_dict, poll_dict, 
-                            retain_weight=perm[0], rec_weight=perm[1], 
-                            rank_weight = perm[2], hf_adv=perm[3], K=perm[4], scaler=perm[5])
+    team_rats = run_elo_sim(game_df, fbs_team_list, rec_pts_dict, poll_dict,
+                            retain_weight=perm[0], rec_weight=perm[1], rank_weight=perm[2],
+                            hf_adv=perm[3], K=perm[4], scaler=perm[5])
         
     # ---------------------
     # ---Evaluate Models---
@@ -164,8 +166,6 @@ for perm in perms:
     
     # remove ties (Elo)
     while len(np.unique(acts)) > 2:
-        # for some (dumb) reason, the below loop will not remove all 0.5's & related
-        # indices the first go around. So it's ran until we get only the binary
         for index, value in enumerate(acts):
             if value == 0.5:
                 del preds[index]
@@ -173,8 +173,6 @@ for perm in perms:
     
     # remove ties (naive)
     while len(np.unique(naive_acts)) > 2:
-        # for some (dumb) reason, the below loop will not remove all 0.5's & related
-        # indices the first go around. So it's ran until we get only the binary
         for index, value in enumerate(naive_acts):
             if value == 0.5:
                 del naive_preds[index]
