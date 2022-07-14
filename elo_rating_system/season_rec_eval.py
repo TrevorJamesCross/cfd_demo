@@ -36,7 +36,7 @@ from toolbox import *
 # ---------------
 
 # define season and games to simulate
-season = 2022
+season = 2018
 
 # define path to SF credentials
 json_creds_path = join(expanduser('~'),'secrets/SF_creds.json')
@@ -48,6 +48,8 @@ conn = connect_to_SF(json_creds_path)
 game_query = """
              select start_date, home_team, home_points, away_team, away_points from games
              where season = {}
+             and season_type = 'regular'
+             and home_points is not null and away_points is not null
              order by start_date
              """.format(season)
                 
@@ -89,7 +91,7 @@ for row in poll_df.itertuples():
             else:
                 poll_dict[info['school'] + '-' + str(row[1])] = []
                 poll_dict[info['school'] + '-' + str(row[1])].append(info['rank'])
-                
+
 # close SF connection
 conn.close()
 
@@ -103,14 +105,14 @@ team_rats = json_to_dict(file_path)
 # ---Run Season Simulations---
 # ----------------------------
 
-# define Elo rating algorithm parameters
-retain_weight = 0.7
+# define parameter iterations
+retain_weight= 0.7
 margin = 7
-rec_weight = 0.375
-rank_weight = 3.5
-hf_adv = 55
-K = 32.5
-scaler = 350
+rec_weight= 0.475
+rank_weight= 3.5
+hf_adv= 60
+K= 32.5
+scaler= 350
 
 # run season simulations
 num_sims = 2000
@@ -151,7 +153,9 @@ if season < 2022:
     # get true game outcomes
     true_rec_dict = dict()
     for key_num, key in enumerate(team_rats):
-        true_rec_dict[key] = [(items[0], items[3]) for items in team_rats[key] if items[0][:4] == str(season)]
+        if key in agg_dict:
+            true_rec_dict[key] = [(items[0], items[3]) for items in team_rats[key]
+                                  if items[0] in list(map(itemgetter(0), agg_dict[key]))]
     
     # get predicted & true actualized values
     pred_acts = []

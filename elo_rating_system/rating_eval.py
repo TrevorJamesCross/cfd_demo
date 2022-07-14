@@ -41,7 +41,7 @@ conn = connect_to_SF(json_creds_path)
 # obtain game data
 game_query = """
              select start_date, home_team, home_points, away_team, away_points from games
-             where season >= 1960 and season < 2022
+             where season >= 1970 and season < 2022
              and home_points is not null and away_points is not null
              order by start_date
              """
@@ -131,9 +131,9 @@ for game in tqdm(game_df.itertuples(), desc='Running Naive Sim ', unit='game', t
 
 # define parameter iterations
 retain_weights = [0.7]
-rec_weights = [0.375] ## makes slight improvement
+rec_weights = [0.475] ## makes slight improvement
 rank_weights = [3.5] ## makes slight improvement
-hf_advs = [55]
+hf_advs = [60]
 Ks = [32.5]
 scalers = [350]
 

@@ -438,6 +438,7 @@ def run_season_sim(season, game_df, team_rats, fbs_team_list, rec_pts_dict, poll
         
         # skip game
         else:
+            print("\n >>> Game Skipped")
             continue
         
         # if away team already in sim dict
@@ -475,6 +476,7 @@ def run_season_sim(season, game_df, team_rats, fbs_team_list, rec_pts_dict, poll
         
         # skip game
         else:
+            print("\n >>> Game Skipped")
             
             # remove empty list of home team
             if len(sim_dict[game[2]]) == 0:
