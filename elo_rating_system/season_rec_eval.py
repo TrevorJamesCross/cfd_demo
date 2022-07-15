@@ -1,7 +1,7 @@
 """
 College Football Data Demo: Season Record Evaluation
 Author: Trevor Cross
-Last Updated: 07/12/22
+Last Updated: 07/13/22
 
 Simuates NCAAF games using an Elo rating algorithm to predict end season
 records.
@@ -36,7 +36,7 @@ from toolbox import *
 # ---------------
 
 # define season and games to simulate
-season = 2015
+season = 2022
 
 # define path to SF credentials
 json_creds_path = join(expanduser('~'),'secrets/SF_creds.json')
@@ -45,13 +45,12 @@ json_creds_path = join(expanduser('~'),'secrets/SF_creds.json')
 conn = connect_to_SF(json_creds_path)
 
 # obtain game data
-game_query = """
-            select start_date, home_team, home_points, away_team, away_points, season, season_type from games
-            where season = {}
-            and season_type = 'regular'
-            and iff(season < 2022, home_points is not null and away_points is not null, true)
-            order by start_date
-             """.format(season)
+game_query = f"""
+             select start_date, home_team, home_points, away_team, away_points, season, season_type from games
+             where season = {season}
+             and iff(season < 2022, home_points is not null and away_points is not null, true)
+             order by start_date
+             """
                 
 game_df = pd.read_sql(game_query, conn)
 
@@ -63,10 +62,10 @@ fbs_query = """
 fbs_team_list = pd.read_sql(fbs_query, conn)['SCHOOL'].tolist()
 
 # obtain recruitment data
-rec_query = """ 
-            select year, team, points from recruiting_teams
-            where year = {}
-            """.format(season)
+rec_query =  f""" 
+             select year, team, points from recruiting_teams
+             where year = {season}
+             """
 
 rec_pts_df = pd.read_sql(rec_query, conn)
 rec_pts_dict = dict(zip( (rec_pts_df['TEAM'] + '-' + rec_pts_df['YEAR'].apply(str)), rec_pts_df['POINTS']))
