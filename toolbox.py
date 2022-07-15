@@ -157,14 +157,15 @@ def MOV_mult(home_rat, away_rat, margin):
     return np.log(abs(margin)+1) * ( 2.2 / (abs(home_rat - away_rat)*0.001 + 2.2) )
 
 ## define function to calculate Elo confidence
-def calc_conf(rat_a, rat_b, scaler=400):
-    return 1 / ( 1 + pow(10, (rat_b-rat_a)/scaler) )
+def calc_conf(rat_a, rat_b, gt_mult=1.0, scaler=400):
+    return 1 / ( 1 + pow(10, gt_mult*(rat_b-rat_a)/scaler) )
 
 ## define function to calculate new Elo rating
-def calc_new_rats(home_rat, away_rat, margin, hf_adv=0, K=25, scaler=400):
+def calc_new_rats(home_rat, away_rat, margin, hf_adv=0, gt_mult=1.0,
+                  K=25, scaler=400):
 
     # calc home & away confidence
-    home_conf = calc_conf(home_rat+hf_adv, away_rat, scaler=scaler)
+    home_conf = calc_conf(home_rat+hf_adv, away_rat, gt_mult=gt_mult, scaler=scaler)
     away_conf = 1 - home_conf
     
     # determine actualized home confidence
@@ -179,11 +180,11 @@ def calc_new_rats(home_rat, away_rat, margin, hf_adv=0, K=25, scaler=400):
     away_act = 1 - home_act
     
     # calc margin of victory multiplier
-    mult = MOV_mult(home_rat, away_rat, margin)
+    mov_mult = MOV_mult(home_rat, away_rat, margin)
     
     # calc new home & away ratings
-    home_rat_new = home_rat + mult*K*(home_act - home_conf)
-    away_rat_new = away_rat + mult*K*(away_act - away_conf)
+    home_rat_new = home_rat + mov_mult*K*(home_act - home_conf)
+    away_rat_new = away_rat + mov_mult*K*(away_act - away_conf)
     
     # return new ratings, confidence, and actualized value
     return (round(home_rat_new), home_conf, home_act), (round(away_rat_new), away_conf, away_act)
@@ -218,11 +219,15 @@ def build_matchup_dict(game_df, current_season):
     
 ## define function to run elo simulation
 def run_elo_sim(game_df, fbs_team_list, rec_pts_dict, poll_dict,
-                retain_weight=0.90, rec_weight=0.1, rank_weight=5, hf_adv=0, K=25, scaler=400):
+                retain_weight=0.90, rec_weight=0.1, rank_weight=5, hf_adv=0, ps_mult=1.2,
+                K=25, scaler=400):
     
     # create dictionary to record team Elo ratings
     team_rats = dict()
-        
+    
+    # create last_season variable
+    last_season = 0
+    
     # iterate through games
     for game in tqdm(game_df.itertuples(), desc='Running Elo Sim ', unit=' games', total=game_df.shape[0]):
 
@@ -230,10 +235,10 @@ def run_elo_sim(game_df, fbs_team_list, rec_pts_dict, poll_dict,
         date = str(datetime.strptime(game[1][:10], '%Y-%m-%d').date())
         
         # if home team exists and in same season
-        if game[2] in team_rats and int(team_rats[game[2]][-1][0][:4]) == int(date[:4]):
+        if game[2] in team_rats and game[6] == team_rats[game[2]][-1][0]:
             
             # get current home rating
-            home_rat = team_rats[game[2]][-1][1]
+            home_rat = team_rats[game[2]][-1][2]
         
         # if home team exists and NOT in same season
         elif game[2] in team_rats:
@@ -242,19 +247,19 @@ def run_elo_sim(game_df, fbs_team_list, rec_pts_dict, poll_dict,
             init_rat = get_init_rat(game[2], fbs_team_list)
             
             # calc recruitment bonus
-            if int(date[:4]) > 2004 and game[2] + '-' + date[:4] in rec_pts_dict:
-                rec_bonus = rec_weight * float(rec_pts_dict[game[2] + '-' + date[:4]])
+            if game[6] > 2003 and f'{game[2]}-{game[6]}' in rec_pts_dict:
+                rec_bonus = rec_weight * float(rec_pts_dict[f'{game[2]}-{game[6]}'])
             else:
                 rec_bonus = 0
             
             # calc rank bonus
-            if game[2] + '-' + date[:4] in poll_dict:
-                rank_bonus = (26 - np.mean(poll_dict[game[2] + '-' + date[:4]])) * rank_weight
+            if f'{game[2]}-{game[6]}' in poll_dict:
+                rank_bonus = (26 - np.mean(poll_dict[f'{game[2]}-{game[6]}'])) * rank_weight
             else:
                 rank_bonus = 0
             
             # reset home rating
-            home_rat = int(retain_weight*(team_rats[game[2]][-1][1] - init_rat + rec_bonus) + init_rat + rank_bonus)
+            home_rat = int(retain_weight*(team_rats[game[2]][-1][2] - init_rat + rec_bonus) + init_rat + rank_bonus)
         
         # if NOT home team exists
         else:
@@ -263,14 +268,14 @@ def run_elo_sim(game_df, fbs_team_list, rec_pts_dict, poll_dict,
             init_rat = get_init_rat(game[2], fbs_team_list)
             
             # append home team to dict
-            team_rats[game[2]] = [(date, init_rat, None, None)]
-            home_rat = team_rats[game[2]][-1][1]
+            team_rats[game[2]] = [(game[6], date, init_rat, None, None)]
+            home_rat = team_rats[game[2]][-1][2]
         
         # if away team exists and in same season
-        if game[4] in team_rats and int(team_rats[game[4]][-1][0][:4]) == int(date[:4]):
+        if game[4] in team_rats and game[6] == team_rats[game[4]][-1][0]:
             
             # get current home rating
-            away_rat = team_rats[game[4]][-1][1]
+            away_rat = team_rats[game[4]][-1][2]
         
         # if away team exists and NOT in same season
         elif game[4] in team_rats:
@@ -279,19 +284,19 @@ def run_elo_sim(game_df, fbs_team_list, rec_pts_dict, poll_dict,
             init_rat = get_init_rat(game[4], fbs_team_list)
             
             # calc recruitment bonus
-            if int(date[:4]) > 2004 and game[4] + '-' + date[:4] in rec_pts_dict:
-                rec_bonus = rec_weight * float(rec_pts_dict[game[4] + '-' + date[:4]])
+            if game[6] > 2003 and f'{game[4]}-{game[6]}' in rec_pts_dict:
+                rec_bonus = rec_weight * float(rec_pts_dict[f'{game[4]}-{game[6]}'])
             else:
                 rec_bonus = 0
             
             # calc rank bonus
-            if game[4] + '-' + date[:4] in poll_dict:
-                rank_bonus = (26 - np.mean(poll_dict[game[4] + '-' + date[:4]])) * rank_weight
+            if f'{game[4]}-{game[6]}' in poll_dict:
+                rank_bonus = (26 - np.mean(poll_dict[f'{game[4]}-{game[6]}'])) * rank_weight
             else:
                 rank_bonus = 0
             
             # reset away rating
-            away_rat = int(retain_weight*(team_rats[game[4]][-1][1]- init_rat + rec_bonus) + init_rat + rank_bonus)
+            away_rat = int(retain_weight*(team_rats[game[4]][-1][2]- init_rat + rec_bonus) + init_rat + rank_bonus)
         
         # if NOT away team exists
         else:
@@ -300,26 +305,37 @@ def run_elo_sim(game_df, fbs_team_list, rec_pts_dict, poll_dict,
             init_rat = get_init_rat(game[4], fbs_team_list)
             
             # append away team to dict
-            team_rats[game[4]] = [(date, init_rat, None, None)]
-            away_rat = team_rats[game[4]][-1][1]
+            team_rats[game[4]] = [(game[6], date, init_rat, None, None)]
+            away_rat = team_rats[game[4]][-1][2]
+        
+        # redefine last_season
+        last_season = game[6]
         
         # calc score margin from game
         margin = game[3] - game[5]
-            
+        
+        # determine game type multiplier
+        if game[7] == 'postseason':
+            gt_mult = ps_mult
+        else:
+            gt_mult = 1.0
+        
         # calc new ratings
-        home_info, away_info = calc_new_rats(home_rat, away_rat, margin, hf_adv=hf_adv, K=K, scaler=scaler)
+        home_info, away_info = calc_new_rats(home_rat, away_rat, margin, hf_adv=hf_adv, gt_mult=gt_mult,
+                                             K=K, scaler=scaler)
+        
         home_rat_new, home_conf, home_act = home_info
         away_rat_new, away_conf, away_act = away_info
         
         # append new ratings to dict
-        team_rats[game[2]].append( (date, home_rat_new, home_conf, home_act) )
-        team_rats[game[4]].append( (date, away_rat_new, away_conf, away_act) )
-        
+        team_rats[game[2]].append( (game[6], date, home_rat_new, home_conf, home_act) )
+        team_rats[game[4]].append( (game[6], date, away_rat_new, away_conf, away_act) )
+
     # return dictionary of team Elo ratings
     return team_rats
     
 ## define function to plot ratings
-def plot_rats(team_rats, team_name, previous_seasons=5):
+def plot_rats(team_rats, team_name, previous_seasons=10):
         
         # create figure
         plt.figure()
@@ -359,11 +375,16 @@ def plot_rats(team_rats, team_name, previous_seasons=5):
 # ---Define Record Prediction Functions---
 # ----------------------------------------
 
+## define function to calc predicted margin of victory
+def calc_pred_MOV(home_rat, away_rat, pts_per_dif=25):
+    return abs(away_rat-home_rat) // pts_per_dif
+
 ## define function to sample game results
-def sample_game_results(home_rat, away_rat, margin=7, hf_adv=0, K=25, scaler=400):
+def sample_game_results(home_rat, away_rat, hf_adv=0, gt_mult=1.0,
+                        K=25, scaler=400):
     
     # calc confidence
-    home_conf = calc_conf(home_rat+hf_adv, away_rat, scaler)
+    home_conf = calc_conf(home_rat+hf_adv, away_rat, gt_mult, scaler)
     away_conf = 1 - home_conf
     
     # generate random number
@@ -378,8 +399,11 @@ def sample_game_results(home_rat, away_rat, margin=7, hf_adv=0, K=25, scaler=400
     # calc away actualized value
     away_act = 1 - home_act
     
+    # calc predicted MOV
+    pred_margin = calc_pred_MOV(home_rat, away_rat)
+    
     # calc MOV multiplier
-    mult = MOV_mult(home_rat, away_rat, margin)
+    mult = MOV_mult(home_rat, away_rat, pred_margin)
     
     # calc new home & away ratings
     home_rat_new = home_rat + mult*K*(home_act - home_conf)
@@ -391,7 +415,8 @@ def sample_game_results(home_rat, away_rat, margin=7, hf_adv=0, K=25, scaler=400
 
 ## define function to run record prediction for a season
 def run_season_sim(season, game_df, team_rats, fbs_team_list, rec_pts_dict, poll_dict, 
-                   retain_weight=0.90, margin=7, rec_weight=0.1, rank_weight=5, hf_adv=0, K=25, scaler=400):
+                   retain_weight=0.90, rec_weight=0.1, rank_weight=5, hf_adv=0, ps_mult=1.2,
+                   K=25, scaler=400):
 
     # create dictionary to record hot team ratings
     sim_dict = dict()
@@ -406,7 +431,7 @@ def run_season_sim(season, game_df, team_rats, fbs_team_list, rec_pts_dict, poll
         if game[2] in sim_dict:
             
             # get current home rating
-            home_rat = sim_dict[game[2]][-1][1]
+            home_rat = sim_dict[game[2]][-1][2]
         
         # if home team in ratings dict
         elif game[2] in team_rats:
@@ -415,22 +440,22 @@ def run_season_sim(season, game_df, team_rats, fbs_team_list, rec_pts_dict, poll
             init_rat = get_init_rat(game[2], fbs_team_list)
             
             # calc recruitment bonus
-            if int(date[:4]) > 2004 and game[2] + '-' + date[:4] in rec_pts_dict:
-                rec_bonus = rec_weight * float(rec_pts_dict[game[2] + '-' + date[:4]])
+            if game[6] > 2003 and f'{game[2]}-{game[6]}' in rec_pts_dict:
+                rec_bonus = rec_weight * float(rec_pts_dict[f'{game[2]}-{game[6]}'])
             else:
                 rec_bonus = 0
             
             # calc rank bonus
-            if game[2] + '-' + date[:4] in poll_dict:
-                rank_bonus = (26 - np.mean(poll_dict[game[2] + '-' + date[:4]])) * rank_weight
+            if f'{game[2]}-{game[6]}' in poll_dict:
+                rank_bonus = (26 - np.mean(poll_dict[f'{game[2]}-{game[6]}'])) * rank_weight
             else:
                 rank_bonus = 0
             
             # get starting rating for the season
             try:
-                home_rat = next(team_rats[game[2]][items_num-1][1] for items_num, items in enumerate(team_rats[game[2]]) if items[0][:4]==str(season))
+                home_rat = next(team_rats[game[2]][items_num-1][2] for items_num, items in enumerate(team_rats[game[2]]) if items[0]==game[6])
             except StopIteration:
-                home_rat = retain_weight*(team_rats[game[2]][-1][1] - init_rat + rec_bonus) + init_rat + rank_bonus
+                home_rat = retain_weight*(team_rats[game[2]][-1][2] - init_rat + rec_bonus) + init_rat + rank_bonus
                 
 
             # append home team to sim dict
@@ -438,14 +463,13 @@ def run_season_sim(season, game_df, team_rats, fbs_team_list, rec_pts_dict, poll
         
         # skip game
         else:
-            print("\n >>> Game Skipped")
             continue
         
         # if away team already in sim dict
         if game[4] in sim_dict:
             
             # get current home rating
-            away_rat = sim_dict[game[4]][-1][1]
+            away_rat = sim_dict[game[4]][-1][2]
         
         # if away team in ratings dict
         elif game[4] in team_rats:
@@ -454,29 +478,28 @@ def run_season_sim(season, game_df, team_rats, fbs_team_list, rec_pts_dict, poll
             init_rat = get_init_rat(game[4], fbs_team_list)
             
             # calc recruitment bonus
-            if int(date[:4]) > 2004 and game[4] + '-' + date[:4] in rec_pts_dict:
-                rec_bonus = rec_weight * float(rec_pts_dict[game[4] + '-' + date[:4]])
+            if game[6] > 2003 and f'{game[4]}-{game[6]}' in rec_pts_dict:
+                rec_bonus = rec_weight * float(rec_pts_dict[f'{game[4]}-{game[6]}'])
             else:
                 rec_bonus = 0
             
             # calc rank bonus
-            if game[4] + '-' + date[:4] in poll_dict:
-                rank_bonus = (26 - np.mean(poll_dict[game[4] + '-' + date[:4]])) * rank_weight
+            if f'{game[4]}-{game[6]}' in poll_dict:
+                rank_bonus = (26 - np.mean(poll_dict[f'{game[4]}-{game[6]}'])) * rank_weight
             else:
                 rank_bonus = 0
             
             # get starting rating for the season
             try:
-                away_rat = next(team_rats[game[4]][items_num-1][1] for items_num, items in enumerate(team_rats[game[4]]) if items[0][:4]==str(season))
+                away_rat = next(team_rats[game[4]][items_num-1][2] for items_num, items in enumerate(team_rats[game[4]]) if items[0]==game[6])
             except StopIteration:
-                away_rat = retain_weight*(team_rats[game[4]][-1][1] - init_rat + rec_bonus) + init_rat + rank_bonus
+                away_rat = retain_weight*(team_rats[game[4]][-1][2] - init_rat + rec_bonus) + init_rat + rank_bonus
                 
             # append away team to sim dict
             sim_dict[game[4]] = []
         
         # skip game
         else:
-            print("\n >>> Game Skipped")
             
             # remove empty list of home team
             if len(sim_dict[game[2]]) == 0:
@@ -484,14 +507,22 @@ def run_season_sim(season, game_df, team_rats, fbs_team_list, rec_pts_dict, poll
                 
             continue
         
+        # determine game type multiplier
+        if game[7] == 'postseason':
+            gt_mult = ps_mult
+        else:
+            gt_mult = 1.0
+        
         # sample game results
-        home_info, away_info = sample_game_results(home_rat, away_rat, margin=margin, hf_adv=hf_adv, K=K, scaler=scaler)
+        home_info, away_info = sample_game_results(home_rat, away_rat, hf_adv=hf_adv, gt_mult=gt_mult,
+                                                   K=K, scaler=scaler)
+        
         home_rat_new, home_conf, home_act = home_info
         away_rat_new, away_conf, away_act = away_info
         
         # append new ratings to dict
-        sim_dict[game[2]].append( (date, home_rat_new, home_conf, home_act) )
-        sim_dict[game[4]].append( (date, away_rat_new, away_conf, away_act) )
+        sim_dict[game[2]].append( (game[6], date, home_rat_new, home_conf, home_act) )
+        sim_dict[game[4]].append( (game[6], date, away_rat_new, away_conf, away_act) )
         
     # return dictionary of team Elo ratings
     return sim_dict
@@ -568,7 +599,7 @@ def json_to_dict(file_path):
         return json.load(file)
     
 ## define function to plot calibration curve
-def plot_cal_curve(acts, preds, n_bins=5):
+def plot_cal_curve(acts, preds, n_bins=10):
     probs_act, probs_pred = calibration_curve(acts, preds, n_bins=n_bins)
     
     plt.plot([0,1],[0,1],':k')

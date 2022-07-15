@@ -40,7 +40,7 @@ conn = connect_to_SF(json_creds_path)
 
 # obtain game data
 game_query = """
-             select start_date, home_team, home_points, away_team, away_points from games
+             select start_date, home_team, home_points, away_team, away_points, season, season_type from games
              where season >= 1970 and season < 2022
              and home_points is not null and away_points is not null
              order by start_date
@@ -61,7 +61,7 @@ rec_query = """
             """
 
 rec_pts_df = pd.read_sql(rec_query, conn)
-rec_pts_dict = dict(zip( (rec_pts_df['TEAM'] + '-' + rec_pts_df['YEAR'].apply(str)), rec_pts_df['POINTS']))
+rec_pts_dict = dict(zip( f"{rec_pts_df['TEAM']}-{rec_pts_df['YEAR'].apply(str)}", rec_pts_df['POINTS']))
 
 # obtain preseason polling info
 poll_query = """
@@ -78,11 +78,11 @@ for row in poll_df.itertuples():
     for poll in poll_list:
         info_list = poll['ranks']
         for info in info_list:
-            if info['school'] + '-' + str(row[1]) in poll_dict:
-                poll_dict[info['school'] + '-' + str(row[1])].append(info['rank'])
+            if f"{info['school']}-{str(row[1])}" in poll_dict:
+                poll_dict[f"{info['school']}-{str(row[1])}"].append(info['rank'])
             else:
-                poll_dict[info['school'] + '-' + str(row[1])] = []
-                poll_dict[info['school'] + '-' + str(row[1])].append(info['rank'])
+                poll_dict[f"{info['school']}-{str(row[1])}"] = []
+                poll_dict[f"{info['school']}-{str(row[1])}"].append(info['rank'])
                 
 # close connection
 conn.close()
@@ -130,15 +130,16 @@ for game in tqdm(game_df.itertuples(), desc='Running Naive Sim ', unit='game', t
 # ------------------------
 
 # define parameter iterations
-retain_weights = [0.7]
-rec_weights = [0.475] ## makes slight improvement
-rank_weights = [3.5] ## makes slight improvement
-hf_advs = [60]
-Ks = [32.5]
-scalers = [350]
+retain_weights = [0.65]
+rec_weights = [0.65] ## makes slight improvement
+rank_weights = [3.75] ## makes slight improvement
+hf_advs = [65]
+ps_mults = [1.20] ## makes slight improvement
+Ks = [40]
+scalers = [375]
 
 # get parameter permutations
-perms = cart_prod([retain_weights, rec_weights, rank_weights, hf_advs, Ks, scalers])
+perms = cart_prod([retain_weights, rec_weights, rank_weights, hf_advs, ps_mults, Ks, scalers])
 
 # store perm results
 results = []
@@ -147,7 +148,7 @@ results = []
 for perm in perms:
     team_rats = run_elo_sim(game_df, fbs_team_list, rec_pts_dict, poll_dict,
                             retain_weight=perm[0], rec_weight=perm[1], rank_weight=perm[2],
-                            hf_adv=perm[3], K=perm[4], scaler=perm[5])
+                            hf_adv=perm[3], ps_mult=perm[4], K=perm[5], scaler=perm[6])
         
     # ---------------------
     # ---Evaluate Models---
@@ -157,8 +158,8 @@ for perm in perms:
     preds = []
     acts = []
     for key in team_rats:
-        preds.extend(list(map(itemgetter(2), team_rats[key])))
-        acts.extend(list(map(itemgetter(3), team_rats[key])))
+        preds.extend(list(map(itemgetter(3), team_rats[key])))
+        acts.extend(list(map(itemgetter(4), team_rats[key])))
     
     # remove Nonetype objects (Elo)
     preds = [pred for pred in preds if pred != None]

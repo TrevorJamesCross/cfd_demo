@@ -36,7 +36,7 @@ from toolbox import *
 # ---------------
 
 # define season and games to simulate
-season = 2018
+season = 2015
 
 # define path to SF credentials
 json_creds_path = join(expanduser('~'),'secrets/SF_creds.json')
@@ -46,11 +46,11 @@ conn = connect_to_SF(json_creds_path)
 
 # obtain game data
 game_query = """
-             select start_date, home_team, home_points, away_team, away_points from games
-             where season = {}
-             and season_type = 'regular'
-             and home_points is not null and away_points is not null
-             order by start_date
+            select start_date, home_team, home_points, away_team, away_points, season, season_type from games
+            where season = {}
+            and season_type = 'regular'
+            and iff(season < 2022, home_points is not null and away_points is not null, true)
+            order by start_date
              """.format(season)
                 
 game_df = pd.read_sql(game_query, conn)
@@ -86,11 +86,11 @@ for row in poll_df.itertuples():
     for poll in poll_list:
         info_list = poll['ranks']
         for info in info_list:
-            if info['school'] + '-' + str(row[1]) in poll_dict:
-                poll_dict[info['school'] + '-' + str(row[1])].append(info['rank'])
+            if f"{info['school']}-{str(row[1])}" in poll_dict:
+                poll_dict[f"{info['school']}-{str(row[1])}"].append(info['rank'])
             else:
-                poll_dict[info['school'] + '-' + str(row[1])] = []
-                poll_dict[info['school'] + '-' + str(row[1])].append(info['rank'])
+                poll_dict[f"{info['school']}-{str(row[1])}"] = []
+                poll_dict[f"{info['school']}-{str(row[1])}"].append(info['rank'])
 
 # close SF connection
 conn.close()
@@ -106,18 +106,18 @@ team_rats = json_to_dict(file_path)
 # ----------------------------
 
 # define parameter iterations
-retain_weight= 0.7
-margin = 7
-rec_weight= 0.475
-rank_weight= 3.5
-hf_adv= 60
-K= 32.5
-scaler= 350
+retain_weight = 0.65
+rec_weight = 0.65 
+rank_weight = 3.75 
+hf_adv = 65
+ps_mult = 1.20
+K = 40
+scaler = 375
 
 # run season simulations
 num_sims = 2000
 func_inputs = [(season, game_df, team_rats, fbs_team_list, rec_pts_dict, poll_dict,
-                retain_weight, margin, rec_weight, rank_weight, hf_adv, K, scaler)]*num_sims
+                retain_weight, rec_weight, rank_weight, hf_adv, K, scaler)]*num_sims
 
 with Pool() as pool:
     list_of_sims = pool.starmap(run_season_sim, tqdm(func_inputs, desc="Running Sims ", unit=' sims'))
@@ -137,12 +137,12 @@ for key_num, key in enumerate(team_sims_dict):
     
     for items_num in range(len(team_sims_dict[key][0])):
         like_games = list(map(itemgetter(items_num), team_sims_dict[key]))
-        date = like_games[0][0]
-        mean_rats = np.mean(list(map(itemgetter(1), like_games)))
-        mean_conf = np.mean(list(map(itemgetter(2), like_games)))
-        mean_act = np.mean(list(map(itemgetter(3), like_games)))
+        date = like_games[0][1]
+        mean_rats = np.mean(list(map(itemgetter(2), like_games)))
+        mean_conf = np.mean(list(map(itemgetter(3), like_games)))
+        mean_act = np.mean(list(map(itemgetter(4), like_games)))
         
-        agg_dict[key].append( (date, mean_rats, mean_conf, mean_act) )
+        agg_dict[key].append( (date, round(mean_rats), mean_conf, round(mean_act)) )
     
 # --------------------------
 # ---Evaluate Simulations---
@@ -154,14 +154,14 @@ if season < 2022:
     true_rec_dict = dict()
     for key_num, key in enumerate(team_rats):
         if key in agg_dict:
-            true_rec_dict[key] = [(items[0], items[3]) for items in team_rats[key]
-                                  if items[0] in list(map(itemgetter(0), agg_dict[key]))]
+            true_rec_dict[key] = [(items[1], items[4]) for items in team_rats[key]
+                                  if items[1] in list(map(itemgetter(0), agg_dict[key]))]
     
     # get predicted & true actualized values
     pred_acts = []
     true_acts = []
     for key_num, key in enumerate(agg_dict):
-        pred_acts.extend(list(map(itemgetter(3), agg_dict[key])))
+        pred_acts.extend(list(map(itemgetter(2), agg_dict[key])))
         true_acts.extend(list(map(itemgetter(1), true_rec_dict[key])))
     
     # remove Nonetype from true_acts
@@ -169,17 +169,17 @@ if season < 2022:
     true_acts = [act for act in true_acts if act != None]
     
     # print season & number of simulations aggregated
-    print("\n >>> {}, Number of Sims: {}".format(season, num_sims))
+    print(f"\n >>> {season}, Number of Sims: {num_sims}")
     
     # calc log loss & accuracy
     loss = log_loss(true_acts, pred_acts)
-    print("\n >>> Log Loss: {}".format(loss))
+    print(f"\n >>> Log Loss: {loss}")
             
     acc = accuracy_score(true_acts, list(map(round, pred_acts)))
-    print("\n >>> Accuracy: {}".format(acc))
+    print(f"\n >>> Accuracy: {acc}")
     
     # evaluate a team's season record
-    team_name = 'Illinois'
+    team_name = 'Wisconsin'
     team_rec, perc_corr = eval_rec(agg_dict, true_rec_dict, team_name)
     
-    print("\n {}'s Record Prediction: {} {}".format(team_name, team_rec, perc_corr))
+    print(f"\n {team_name}'s Record Prediction: {team_rec} {perc_corr}")
