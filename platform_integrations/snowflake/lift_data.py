@@ -48,7 +48,7 @@ conn = connect_to_SF(json_creds_path)
 empty = ['']
 years = list(np.arange(2001,2022))
 weeks = list(np.arange(1,10))
-seasonTypes = ['postseason']
+seasonTypes = ['regular', 'postseason']
 
 teams_fbs_resp = list(conn.cursor().execute("SELECT school FROM teams_fbs"))
 teams_fbs = [''.join(school).replace(' ','%20') for school in teams_fbs_resp]
@@ -57,13 +57,13 @@ teams_fbs = [''.join(school).replace(' ','%20') for school in teams_fbs_resp]
 base_url = "https://api.collegefootballdata.com"
 
 # define list of sections
-sections = ['plays']
+sections = ['drives']
 
 # define dictionary of subsections
-subsection_dict = {'plays':['']}
+subsection_dict = {'drives':['']}
 
 # define filters for subsections
-filter_dict = {'':['year', 'week', 'seasonType']}
+filter_dict = {'':['year', 'seasonType']}
 
 # define filter plugins values dictionary
 plugin_dict = {'':empty,
@@ -72,6 +72,10 @@ plugin_dict = {'':empty,
                'team1':teams_fbs,
                'team2':teams_fbs,
                'seasonType':seasonTypes}
+
+# -----------------------
+# ---Append Data to SF---
+# -----------------------
 
 # iterate through sections
 for sec in sections:
@@ -91,7 +95,7 @@ for sec in sections:
                 
                 # build URL
                 url = build_url(base_url, sec, subsec, final_filter)
-                print("\n >>> URL: " + url)
+                print(f"\n >>> URL: {url}")
                 
                 try:
                     # send API request
@@ -108,16 +112,16 @@ for sec in sections:
                 # append data to SF table if not empty
                 if len(df) > 0 and not df.equals(bad_df):
                     
-                    # # create table in SF
-                    # if subsec != '':
-                    #     table_name = '_'.join([sec,subsec])
-                    # else:
-                    #     table_name = sec
-                    table_name = 'PLAY_BY_PLAY'
+                    # create table in SF
+                    if subsec != '':
+                        table_name = '_'.join([sec,subsec])
+                    else:
+                        table_name = sec
+                    
                     try:
                         create_table(conn, table_name, get_col_info(df))
                     except:
-                        print()
+                        pass
                         
                     # append data to SF table
                     append_data(conn, df, table_name)

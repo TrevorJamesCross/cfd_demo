@@ -1,9 +1,10 @@
 """
 College Football Data Demo: Toolbox
 Author: Trevor Cross
-Last Updated: 07/12/22
+Last Updated: 07/18/22
 
-Series of functions used to extract and analyze data from collegefootballdata.com.
+Series of functions used to extract, load, transform, and analyze data from
+collegefootballdata.com.
 """
 
 # ----------------------
@@ -41,7 +42,7 @@ def make_request(url, api_key):
     
     # define headers
     headers = {"Content-Type": "application/json",
-               "Authorization": "Bearer {}".format(api_key)}
+               "Authorization": f"Bearer {api_key}"}
 
     # return API call as df
     return pd.DataFrame(req.get(url, headers=headers).json())
@@ -69,7 +70,7 @@ def build_filter(filter_names, filter_plugins):
     
     # build filter
     for filter_num, filter_name in enumerate(filter_names):
-        final_filter =  final_filter + filter_name + "=" + str(filter_plugins[filter_num]) + "&"
+        final_filter =  f'{final_filter}{filter_name}={filter_plugins[filter_num]}&'
     
     # return final filter (remove last '&')
     return final_filter[:-1]
@@ -113,14 +114,14 @@ def create_table(conn, table_name, col_info):
     
     # create table
     conn.cursor().execute(
-        """
-        CREATE TABLE
-        {}({})
-        """.format(table_name, col_info)
+        f"""
+         CREATE TABLE
+         {table_name}({col_info})
+         """
         )
     
     # print result
-    print("\n >>> Table {} created!".format(table_name.upper()))
+    print(f"\n >>> Table {table_name.upper()} created!")
     
 ## define function to append data into table in SF
 def append_data(conn, df, table_name):
@@ -133,9 +134,9 @@ def append_data(conn, df, table_name):
     
     # print result
     if success:
-        print("\n >>> {} rows appended to table {}!".format(num_rows, table_name.upper()))
+        print(f"\n >>> {num_rows} rows appended to table {table_name.upper()}!")
     else:
-        print("\n >>> Something went wrong...")
+        print(f"\n >>> Something went wrong...")
 
 # -------------------------------------------
 # ---Define Elo Rating Algorithm Functions---
@@ -190,6 +191,7 @@ def calc_new_rats(home_rat, away_rat, margin, hf_adv=0, gt_mult=1.0,
     return (round(home_rat_new), home_conf, home_act), (round(away_rat_new), away_conf, away_act)
 
 ## define function to record matchup history in dictionary
+## DOESN'T HELP; REMOVED FROM ALGO
 def build_matchup_dict(game_df, current_season):
     
     # define matchup dictionary

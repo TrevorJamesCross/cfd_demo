@@ -41,8 +41,9 @@ conn = connect_to_SF(json_creds_path)
 # obtain game data
 game_query = """
              select start_date, home_team, home_points, away_team, away_points, season, season_type from games
-             where season >= 1970 and season < 2022
-             and home_points is not null and away_points is not null
+             where (season >= 1970 and season < 2022)
+             and (home_points is not null and away_points is not null)
+             and (home_division = 'fbs' or away_division = 'fbs')
              order by start_date
              """
                 
