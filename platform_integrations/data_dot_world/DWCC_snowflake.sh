@@ -7,7 +7,8 @@ datadotworld/dwcc:latest catalog-snowflake \
 --user=<user> \
 --password=<password> \
 --database=<database> \
---all-schemas \
+#--all-schemas \
+--schema=<schema> \
 --role=SYSADMIN \
 --name=sf_catalog \
 --output=/dwcc-output
