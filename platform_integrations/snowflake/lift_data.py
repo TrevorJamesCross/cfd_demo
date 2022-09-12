@@ -1,7 +1,7 @@
 """
 College Football Data Analytics: Lift Data
 Author: Trevor Cross
-Last Updated: 07/12/22
+Last Updated: 09/12/22
 
 Extracts available data from collegefootballdata.com and loads it into
 snowflake.
@@ -21,7 +21,7 @@ import sys
 import json
 
 # import toolbox functions
-repo_dir = join(expanduser('~'),'CFD_demo')
+repo_dir = join(expanduser('~'),'cfd_demo')
 sys.path.insert(1, repo_dir)
 from toolbox import *
 
@@ -46,9 +46,9 @@ conn = connect_to_SF(json_creds_path)
 
 # define filters
 empty = ['']
-years = list(np.arange(2001,2022))
-weeks = list(np.arange(1,10))
-seasonTypes = ['regular', 'postseason']
+years = [2022]
+weeks = [2]
+seasonTypes = ['regular']
 
 teams_fbs_resp = list(conn.cursor().execute("SELECT school FROM teams_fbs"))
 teams_fbs = [''.join(school).replace(' ','%20') for school in teams_fbs_resp]
@@ -57,13 +57,15 @@ teams_fbs = [''.join(school).replace(' ','%20') for school in teams_fbs_resp]
 base_url = "https://api.collegefootballdata.com"
 
 # define list of sections
-sections = ['drives']
+sections = ['games', 'drives', 'plays']
 
 # define dictionary of subsections
-subsection_dict = {'drives':['']}
+subsection_dict = {'games':[''],
+                   'drives':[''],
+                   'plays':['']}
 
 # define filters for subsections
-filter_dict = {'':['year', 'seasonType']}
+filter_dict = {'':['year', 'week', 'seasonType']}
 
 # define filter plugins values dictionary
 plugin_dict = {'':empty,
@@ -122,7 +124,10 @@ for sec in sections:
                         create_table(conn, table_name, get_col_info(df))
                     except:
                         pass
-                        
+                    
+                    # remove dulicate rows
+                    df.drop_duplicates(subset='id', keep='first', inplace=True)
+                    
                     # append data to SF table
                     append_data(conn, df, table_name)
 
