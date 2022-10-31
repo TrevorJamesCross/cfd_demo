@@ -47,7 +47,7 @@ conn = connect_to_SF(json_creds_path)
 # define filters
 empty = ['']
 years = [2022]
-weeks = [2]
+weeks = [9]
 seasonTypes = ['regular']
 
 teams_fbs_resp = list(conn.cursor().execute("SELECT school FROM teams_fbs"))
@@ -127,6 +127,12 @@ for sec in sections:
                     
                     # remove dulicate rows
                     df.drop_duplicates(subset='id', keep='first', inplace=True)
+                    
+                    # remove erroneous column
+                    try:
+                        df.drop(columns=['completed'], inplace=True)
+                    except KeyError:
+                        pass
                     
                     # append data to SF table
                     append_data(conn, df, table_name)
