@@ -1,7 +1,7 @@
 """
 College Football Data Analytics: Lift Data
 Author: Trevor Cross
-Last Updated: 09/12/22
+Last Updated: 09/28/22
 
 Extracts available data from collegefootballdata.com and loads it into
 snowflake.
@@ -30,7 +30,7 @@ from toolbox import *
 # ------------------------------
 
 # define path to API credentials
-json_api_key = join(expanduser('~'), 'secrets/CFD_API_key.json')
+json_api_key = join(expanduser('~'), 'secrets/cfd_api_key.json')
 
 # get API key
 with open(json_api_key) as file:
@@ -47,7 +47,7 @@ conn = connect_to_SF(json_creds_path)
 # define filters
 empty = ['']
 years = [2022]
-weeks = [9]
+weeks = [13]
 seasonTypes = ['regular']
 
 teams_fbs_resp = list(conn.cursor().execute("SELECT school FROM teams_fbs"))
